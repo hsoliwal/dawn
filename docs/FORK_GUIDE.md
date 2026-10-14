@@ -110,3 +110,37 @@ For an application-level smoke check, use the complete adapter-request example i
 A useful report includes commit, dependency/setup route, compiler and CMake versions, build options, OS/GPU/backend, exact command, expected/actual result, and the smallest relevant log excerpt. Remove credentials and private paths.
 
 Public source and documentation were inspected on 2026-10-14. These commands were not executed, and no build, test, conformance, or performance success is claimed. Fork documentation PRs do not replace upstream Gerrit review or its contributor requirements.
+
+## Worked diagnosis: a mapped-at-creation buffer is rejected
+
+Read [ValidateBufferDescriptor in Buffer.cpp](../src/dawn/native/Buffer.cpp). After unpacking the descriptor and checking usage, it rejects a descriptor whose `mappedAtCreation` is true and whose size is not divisible by four. It separately checks zero usage, permitted usage combinations, host-mapped extensions, and the device's maximum buffer size.
+
+Consider a **hypothetical** descriptor with otherwise valid usage, no host-mapped extension, `mappedAtCreation=true`, and size 6:
+
+1. Locate the size-alignment condition in the validator.
+2. Predict that this condition rejects size 6 because the remainder is 2.
+3. Compare size 8: it avoids this specific rejection, but still must satisfy every other validation rule and successful allocation.
+4. Compare `mappedAtCreation=false`: this particular conditional no longer applies; that does not waive later mapping or resource-use requirements.
+
+This is reasoning from source, not an executed GPU experiment. It does not imply every buffer must always have a size divisible by four.
+
+```sh
+git grep -n 'mappedAtCreation' -- src/dawn/tests/unittests/validation/BufferValidationTests.cpp
+git grep -n 'ValidateBufferDescriptor' -- src/dawn/native
+git grep -n 'DAWN_TRY_CONTEXT' -- src/dawn/native/Device.cpp
+```
+
+Read a matching validation test and its full setup rather than copying only the descriptor. The [error guide](dawn/errors.md) explains primary errors and appended “While” context. Preserve both in a sanitized report: the primary condition identifies what failed, while context identifies the operation and descriptor.
+
+| Observation | What to investigate first |
+| --- | --- |
+| Descriptor validation rejects the request | Input, feature/limit checks, and the nearest validation test |
+| Validation succeeds but allocation fails | Backend/resource error and device state |
+| Adapter selection fails before buffer creation | Adapter/backend availability, not this buffer condition |
+| Unit test passes but GPU execution fails | Backend-specific execution and end-to-end evidence |
+
+Do not suppress validation or attribute a frontend rejection to the driver merely to get past an error. Device loss and out-of-memory are different failure categories; retain the actual error type.
+
+### Keeping commands and examples current
+
+On a dependency or source update, compare the top-level CMake minimum, options, generated Tint target/output names, and the cited validator at the same commit. Update commands when those declarations change. Re-run relevant checks before replacing a source-reviewed statement with a runtime claim, and include GPU/backend details for any newly measured result.
