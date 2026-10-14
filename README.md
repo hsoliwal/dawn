@@ -34,6 +34,8 @@ Helpful links:
 
 ## Documentation table of content
 
+For this fork, start with the [architecture and setup guide](docs/FORK_GUIDE.md): component map, command cheat sheet, test boundaries, and worked exploration.
+
 Developer documentation:
 
  - [Dawn overview](docs/dawn/overview.md)
