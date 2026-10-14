@@ -22,7 +22,7 @@ Choose a route:
 | Dawn Native frontend | Shared API validation and state tracking | [src/dawn/native](../src/dawn/native) |
 | Native backends | Translate work to platform GPU APIs | Backend subdirectories under native |
 | Dawn Wire | Serialize client commands and dispatch them on the server; return callbacks | [src/dawn/wire](../src/dawn/wire) |
-| Dawn Proc | Dispatch through a function table to a selected implementation | [Overview: Dawn Proc](dawn/overview.md#dawn-proc) |
+| Dawn Proc | Dispatch through a function table to a selected implementation | [Overview: Dawn Proc](dawn/overview.md#dawn-proc-dawn_proc) |
 | Tint | Translate WGSL into shader forms used by native backends | [src/tint](../src/tint) |
 | Tests and samples | Exercise internal behavior, validation, GPU execution, and examples | [src/dawn/tests](../src/dawn/tests), [samples](../src/dawn/samples) |
 
