@@ -39,6 +39,10 @@ this fork.
 | Work on WGSL translation | [Tint architecture](docs/tint/arch.md), [Tint source](src/tint), [Tint tests](docs/tint/testing.md) |
 | Evaluate a platform or GPU backend | [Platform/API constraints](docs/support.md), [Dawn tests](docs/dawn/testing.md), [WebGPU CTS runner](docs/standalone_cts_runner.md) |
 
+See the [component guide](docs/repository-components.md), [resource lifecycle](docs/dawn/resource-lifecycle.md),
+and [coverage inventory](docs/component-inventory.md) for pinned build/package boundaries,
+host/device ownership and explicitly unreviewed areas.
+
 ### Source entrypoints
 
 - [src/dawn/native](src/dawn/native): WebGPU validation/state tracking and native GPU backends
