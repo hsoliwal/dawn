@@ -15,7 +15,7 @@ If you are developing Dawn itself, see also
  * `depot_tools` in your path
  * A build generator, one of:
     * `GN`, provided by `depot_tools`
-    * `CMake` 3.16 or later
+    * `CMake` 3.22 or later, as required by [CMakeLists.txt](../CMakeLists.txt)
  * Ninja 1.12 (or another build tool supported by CMake)
  * Python 3, for fetching dependencies
  * Go 1.23 or later: https://go.dev/

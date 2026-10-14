@@ -8,9 +8,16 @@ that you always get the right dependencies and compilers.
 - A compatible platform (e.g. Windows, macOS, Linux, etc.). Most platforms are fully supported.
 - A compatible C++ compiler supporting at least C++20. Most major compilers are supported.
 - Git for interacting with the Dawn source code repository.
-- CMake for building your project and Dawn. Dawn supports CMake 3.16+.
+- Python 3 for dependency fetching and code generation.
+- CMake for building your project and Dawn. Dawn requires CMake 3.22+, as declared in [CMakeLists.txt](../CMakeLists.txt).
 
 ## Getting the Dawn Code
+
+The examples below clone upstream Dawn. To evaluate this fork instead, use
+`git clone https://github.com/hsoliwal/dawn.git` for the clone step and keep the
+remaining commands relative to that checkout. A build of an upstream checkout
+does not validate changes in this fork.
+
 
 ```shell
 # Change to the directory where you want to create the code repository
@@ -30,7 +37,7 @@ $ cmake -S . -B out/Release -DDAWN_FETCH_DEPENDENCIES=ON -DDAWN_ENABLE_INSTALL=O
 -- Build files have been written to: ${PWD}/out/Release
 ```
 
-- `DAWN_FETCH_DEPENDENCIES=ON` uses a Python script `fetch_dawn_dependencies.py` as a less tedious alternative to setting up depot_tools and fetching dependencies via `gclient`.
+- `DAWN_FETCH_DEPENDENCIES=ON` uses [tools/fetch_dawn_dependencies.py](../tools/fetch_dawn_dependencies.py) as an alternative to fetching dependencies with `gclient`. This downloads external source dependencies and evaluates the checkout's `DEPS` content; use it only with a trusted checkout. See [building.md](building.md) for platform requirements and dependency terms.
 - `DAWN_ENABLE_INSTALL=ON` configures the project to install binaries, headers and cmake configuration files in a directory of your choice. This allows other projects to discover Dawn in CMake and link with it.
 
 Now you can build Dawn:
@@ -49,6 +56,34 @@ $ cmake --install out/Release --prefix install/Release
 ```
 
 This installs Dawn from the `out/Release` build tree into `install/Release`.
+
+## Build and test boundaries
+
+The root [CMakeLists.txt](../CMakeLists.txt) controls the available targets and
+platform-dependent defaults. `DAWN_BUILD_TESTS` and `TINT_BUILD_TESTS` are
+separate options; installing a library does not imply that its tests ran.
+
+To build Dawn's unit-test executable in the same example build tree, explicitly
+enable its tests and build the target defined in
+[src/dawn/tests/CMakeLists.txt](../src/dawn/tests/CMakeLists.txt):
+
+```sh
+cmake -S . -B out/Release -DDAWN_FETCH_DEPENDENCIES=ON -DDAWN_ENABLE_INSTALL=ON -DDAWN_BUILD_TESTS=ON -DCMAKE_BUILD_TYPE=Release
+cmake --build out/Release --target dawn_unittests --config Release
+```
+
+Run the resulting `dawn_unittests` executable separately; its location and
+extension depend on the generator/platform. Use
+[Dawn testing](dawn/testing.md), [Tint testing](tint/testing.md), and the
+[standalone CTS guide](standalone_cts_runner.md) to choose further checks.
+Dawn's GPU end-to-end tests require a usable GPU/backend; unit tests are not a
+substitute for those checks.
+
+When reporting results, include the commit, compiler, generator, build options,
+operating system, GPU/driver where applicable, test selection, and any skips.
+For multi-configuration generators such as Visual Studio, select the same
+configuration consistently when building, installing, and running artifacts
+(for example `--config Release` for CMake build/install commands).
 
 ## Linking your code to the Dawn installation
 
