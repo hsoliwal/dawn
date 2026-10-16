@@ -8,7 +8,7 @@ that you always get the right dependencies and compilers.
 - A compatible platform (e.g. Windows, macOS, Linux, etc.). Most platforms are fully supported.
 - A compatible C++ compiler supporting at least C++20. Most major compilers are supported.
 - Git for interacting with the Dawn source code repository.
-- CMake for building your project and Dawn. Dawn supports CMake 3.16+.
+- CMake for building your project and Dawn. Dawn requires CMake 3.22 or later, as declared in the top-level `CMakeLists.txt`.
 
 ## Getting the Dawn Code
 
