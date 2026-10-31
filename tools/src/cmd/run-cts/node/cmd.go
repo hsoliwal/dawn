@@ -31,9 +31,14 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"os"
 	"os/exec"
+	"os/signal"
 	"path/filepath"
 	"runtime"
+	"strings"
+	"syscall"
+	"time"
 
 	"dawn.googlesource.com/dawn/tools/src/cmd/run-cts/common"
 	"dawn.googlesource.com/dawn/tools/src/cov"
@@ -42,9 +47,13 @@ import (
 	"dawn.googlesource.com/dawn/tools/src/oswrapper"
 )
 
+// runnerName is the file name of the standalone runner executable, without extension.
+const runnerName = "dawn_standalone_cts_runner"
+
 type flags struct {
 	common.Flags
 	bin                  string
+	runner               string
 	backend              string
 	adapterName          string
 	coverageFile         string
@@ -61,27 +70,49 @@ type flags struct {
 	skipVSCodeInfo       bool
 	enforceDefaultLimits bool
 	blockAllFeatures     bool
+	batchSize            int
+	adb                  bool
+	adbSerial            string
+	deviceDir            string
+	stage                string
+	stageOnly            bool
+	caseTimeout          time.Duration
+	startupAllowance     time.Duration
+	recover              bool
 	dawn                 node.Flags
 }
 
+type defaultCmd struct {
+	cmd
+}
+
+func (*defaultCmd) IsDefaultCommand() {}
+
 func init() {
-	common.Register(&cmd{})
+	common.Register(&defaultCmd{})
+	common.Register(&cmd{standalone: true})
 }
 
 type cmd struct {
-	state    common.State
-	flags    flags
-	coverage *common.Coverage
-	query    string
+	standalone bool
+	state      common.State
+	flags      flags
+	coverage   *common.Coverage
+	queries    []string
+	adbPath    string
 }
 
-func (c *cmd) IsDefaultCommand() {}
-
 func (c *cmd) Name() string {
+	if c.standalone {
+		return "standalone"
+	}
 	return "node"
 }
 
 func (c *cmd) Desc() string {
+	if c.standalone {
+		return "runs the CTS with " + runnerName
+	}
 	return "runs the CTS with dawn.node"
 }
 
@@ -93,9 +124,24 @@ func (c *cmd) RegisterFlags(ctx context.Context, cfg common.Config) ([]string, e
 		backendDefault = "vulkan"
 	}
 
+	binDesc := "path to the directory holding cts.cjs and dawn.node"
+	if c.standalone {
+		binDesc = "path to the directory holding " + runnerName
+	}
+
 	c.flags.Flags.Register(cfg.OsWrapper)
-	flag.StringVar(&c.flags.bin, "bin", fileutils.BuildPath(cfg.OsWrapper), "path to the directory holding cts.cjs and dawn.node")
-	flag.BoolVar(&c.flags.isolated, "isolate", false, "run each test in an isolated process")
+	flag.StringVar(&c.flags.bin, "bin", fileutils.BuildPath(cfg.OsWrapper), binDesc)
+	if c.standalone {
+		flag.StringVar(&c.flags.runner, "runner", "", "path to "+runnerName+", overriding -bin")
+		flag.IntVar(&c.flags.batchSize, "batch-size", defaultBatchSize, "maximum number of test cases per runner process")
+		flag.BoolVar(&c.flags.adb, "adb", false, "run the runner on an Android device with adb. -j defaults to 1")
+		flag.StringVar(&c.flags.adbSerial, "adb-serial", "", "serial of the Android device to use")
+		flag.StringVar(&c.flags.deviceDir, "device-dir", "/data/local/tmp/cts", "directory on the Android device that holds the runner and the CTS")
+		flag.StringVar(&c.flags.stage, "stage", stageAuto, "with -adb, when to copy the runner and the CTS onto the device first: auto (when they differ from the copies there), always or never")
+		flag.BoolVar(&c.flags.stageOnly, "stage-only", false, "with -adb, stage onto the device and exit")
+	} else {
+		flag.BoolVar(&c.flags.isolated, "isolate", false, "run each test in an isolated process")
+	}
 	flag.BoolVar(&c.flags.build, "build", true, "attempt to build the CTS before running")
 	flag.BoolVar(&c.flags.validate, "validate", false, "enable backend validation")
 	flag.Var(&c.flags.dawn, "flag", "flag to pass to dawn-node as flag=value. multiple flags must be passed in individually")
@@ -106,14 +152,22 @@ func (c *cmd) RegisterFlags(ctx context.Context, cfg common.Config) ([]string, e
 	flag.BoolVar(&c.flags.dumpShadersPretty, "dump-shaders-pretty", false, "dump WGSL shaders, but don't run symbol renaming. May fail tests that shadow predeclared builtins. Enables --verbose")
 	flag.BoolVar(&c.flags.fxc, "fxc", false, "Use FXC instead of DXC. Disables 'use_dxc' Dawn flag")
 	flag.BoolVar(&c.flags.unrollConstEvalLoops, "unroll-const-eval-loops", unrollConstEvalLoopsDefault, "unroll loops in const-eval tests")
-	flag.BoolVar(&c.flags.genCoverage, "coverage", false, "displays coverage data")
-	flag.StringVar(&c.flags.coverageFile, "export-coverage", "", "write coverage data to the given path")
+	if !c.standalone {
+		flag.BoolVar(&c.flags.genCoverage, "coverage", false, "displays coverage data")
+		flag.StringVar(&c.flags.coverageFile, "export-coverage", "", "write coverage data to the given path")
+	}
 	flag.BoolVar(&c.flags.compatibilityMode, "compat", false, "run tests in compatibility mode")
 	flag.BoolVar(&c.flags.debugCTS, "debug-cts", false, "enable CTS debugging option")
 	flag.BoolVar(&c.flags.skipVSCodeInfo, "skip-vs-code-info", false, "skips emitting VS Code information")
 	flag.BoolVar(&c.flags.enforceDefaultLimits, "enforce-default-limits", false, "enforce the default limits (note: powerPreference tests may fail)")
 	flag.BoolVar(&c.flags.blockAllFeatures, "block-all-features", false, "block all features (except 'core-features-and-limits')")
+	flag.DurationVar(&c.flags.caseTimeout, "case-timeout", common.TestCaseTimeout, "kill a runner process if it produces no result line within this time")
+	flag.DurationVar(&c.flags.startupAllowance, "startup-allowance", defaultStartupAllowance, "extra time allowed for the first result line of each runner process")
+	flag.BoolVar(&c.flags.recover, "recover", true, "start a new runner process on the remaining test cases after a crash or timeout")
 
+	if c.standalone {
+		return nil, nil
+	}
 	return []string{"[query]"}, nil
 }
 
@@ -129,21 +183,33 @@ func (c *cmd) Run(ctx context.Context, cfg common.Config) error {
 		return err
 	}
 
+	ctx, stop := signal.NotifyContext(ctx, os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
 	if c.flags.build {
 		if err := c.state.CTS.Node.BuildIfRequired(c.flags.Verbose, cfg.OsWrapper); err != nil {
 			return err
 		}
 	}
 
-	// Find all the test cases that match r.query.
-	testCases, err := c.state.CTS.QueryTestCases(c.flags.Verbose, c.query)
+	target, _ := c.target()
+	if adb, ok := target.(*adbTarget); ok && c.flags.stage != stageNever {
+		if err := adb.stage(c.flags.runner, c.flags.CTS, c.flags.stage == stageAlways); err != nil {
+			return fmt.Errorf("failed to stage onto the device: %w", err)
+		}
+		if c.flags.stageOnly {
+			return c.state.Close(nil)
+		}
+	}
+
+	testCases, err := c.queryTestCases()
 	if err != nil {
-		return fmt.Errorf("failed to gather tests: %w", err)
+		return err
 	}
 	fmt.Printf("Testing %d test cases...\n", len(testCases))
 
 	var runner func(ctx context.Context, testCases []common.TestCase, results chan<- common.Result, fsReaderWriter oswrapper.FilesystemReaderWriter)
-	if c.flags.isolated {
+	if c.standalone || c.flags.isolated {
 		fmt.Println("Running in parallel isolated...")
 		runner = c.runTestCasesWithCmdline
 	} else {
@@ -181,37 +247,117 @@ func (c *cmd) Run(ctx context.Context, cfg common.Config) error {
 	return nil
 }
 
-// TODO(crbug.com/344014313): Add unittest coverage.
+// target returns where to run the command-line runner, and the CTS directory there.
+func (c *cmd) target() (target, string) {
+	if c.flags.adb {
+		t := &adbTarget{
+			adb:       c.adbPath,
+			serial:    c.flags.adbSerial,
+			deviceDir: c.flags.deviceDir,
+			verbose:   c.flags.Verbose,
+		}
+		return t, t.devicePath(deviceCTS)
+	}
+	runner := c.flags.Node
+	if c.standalone {
+		runner = c.flags.runner
+	}
+	return &localTarget{
+		runner:  runner,
+		dir:     c.flags.CTS,
+		verbose: c.flags.Verbose,
+		// The VS Code launch.json output does not work for the standalone runner,
+		// which reads its test cases from stdin.
+		skipVSCodeInfo: c.flags.skipVSCodeInfo || c.standalone,
+	}, c.flags.CTS
+}
+
 func (c *cmd) processFlags(fsReaderWriter oswrapper.FilesystemReaderWriter) error {
-	// Check mandatory arguments
-	if c.flags.bin == "" {
-		return fmt.Errorf("-bin is not set. It defaults to <dawn>/out/active (%v) which does not exist",
-			filepath.Join(fileutils.DawnRoot(fsReaderWriter), "out/active"))
+	if c.standalone {
+		if c.flags.runner == "" {
+			if c.flags.bin == "" {
+				return fmt.Errorf("-bin is not set. It defaults to <dawn>/out/active (%v) which does not exist",
+					filepath.Join(fileutils.DawnRoot(fsReaderWriter), "out/active"))
+			}
+			exeExt := fileutils.ExeExt
+			if c.flags.adb {
+				exeExt = ""
+			}
+			c.flags.runner = filepath.Join(c.flags.bin, runnerName+exeExt)
+		}
+		if !fileutils.IsFile(c.flags.runner, fsReaderWriter) {
+			return fmt.Errorf("'%v' does not exist", c.flags.runner)
+		}
+		absRunner, err := filepath.Abs(c.flags.runner)
+		if err != nil {
+			return fmt.Errorf("unable to get absolute path for '%v'", c.flags.runner)
+		}
+		c.flags.runner = absRunner
+		if c.flags.batchSize < 1 {
+			return fmt.Errorf("-batch-size must be at least 1")
+		}
+	} else {
+		if c.flags.bin == "" {
+			return fmt.Errorf("-bin is not set. It defaults to <dawn>/out/active (%v) which does not exist",
+				filepath.Join(fileutils.DawnRoot(fsReaderWriter), "out/active"))
+		}
+		if !fileutils.IsDir(c.flags.bin, fsReaderWriter) {
+			return fmt.Errorf("'%v' is not a directory", c.flags.bin)
+		}
+		for _, file := range []string{"cts.cjs", "dawn.node"} {
+			if !fileutils.IsFile(filepath.Join(c.flags.bin, file), fsReaderWriter) {
+				return fmt.Errorf("'%v' does not contain '%v'", c.flags.bin, file)
+			}
+		}
+		absBin, err := filepath.Abs(c.flags.bin)
+		if err != nil {
+			return fmt.Errorf("unable to get absolute path for '%v'", c.flags.bin)
+		}
+		c.flags.bin = absBin
 	}
-	if !fileutils.IsDir(c.flags.bin, fsReaderWriter) {
-		return fmt.Errorf("'%v' is not a directory", c.flags.bin)
+
+	c.queries = flag.Args()
+	if len(c.queries) == 0 {
+		c.queries = []string{"webgpu:*"}
 	}
-	for _, file := range []string{"cts.cjs", "dawn.node"} {
-		if !fileutils.IsFile(filepath.Join(c.flags.bin, file), fsReaderWriter) {
-			return fmt.Errorf("'%v' does not contain '%v'", c.flags.bin, file)
+	// The flag package stops parsing at the first query, so a flag given after
+	// it would otherwise be taken for a query.
+	for _, query := range c.queries {
+		if strings.HasPrefix(query, "-") {
+			return fmt.Errorf("'%v' is not a query; flags must come before the queries", query)
 		}
 	}
-
-	// Make paths absolute
-	absBin, err := filepath.Abs(c.flags.bin)
-	if err != nil {
-		return fmt.Errorf("unable to get absolute path for '%v'", c.flags.bin)
-	}
-	c.flags.bin = absBin
-
-	// The test query is the optional unnamed argument
-	c.query = "webgpu:*"
-	switch len(flag.Args()) {
-	case 0:
-	case 1:
-		c.query = flag.Args()[0]
-	default:
+	if !c.standalone && !c.flags.isolated && len(c.queries) > 1 {
 		return fmt.Errorf("only a single query can be provided")
+	}
+	if c.flags.adb {
+		var err error
+		if c.adbPath, err = exec.LookPath("adb"); err != nil {
+			return fmt.Errorf("-adb needs adb on PATH: %w", err)
+		}
+		if !isFlagSet("j") {
+			c.flags.NumRunners = 1
+		}
+		switch c.flags.stage {
+		case stageAuto, stageAlways:
+		case stageNever:
+			if c.flags.stageOnly {
+				return fmt.Errorf("-stage-only cannot be used with -stage=never")
+			}
+		default:
+			return fmt.Errorf("-stage must be auto, always or never, not '%v'", c.flags.stage)
+		}
+	} else if c.flags.stageOnly {
+		return fmt.Errorf("-stage-only needs -adb")
+	}
+	if c.flags.NumRunners < 1 {
+		c.flags.NumRunners = 1
+	}
+	if c.flags.caseTimeout <= 0 {
+		return fmt.Errorf("-case-timeout must be positive")
+	}
+	if c.flags.startupAllowance < 0 {
+		return fmt.Errorf("-startup-allowance must not be negative")
 	}
 
 	c.flags.dawn.SetOptions(node.Options{
@@ -238,6 +384,37 @@ func (c *cmd) processFlags(fsReaderWriter oswrapper.FilesystemReaderWriter) erro
 	c.state = *state
 
 	return nil
+}
+
+// isFlagSet returns true if the named flag was given on the command line.
+func isFlagSet(name string) bool {
+	set := false
+	flag.Visit(func(f *flag.Flag) {
+		if f.Name == name {
+			set = true
+		}
+	})
+	return set
+}
+
+// queryTestCases returns the test cases that match c.queries, in order.
+func (c *cmd) queryTestCases() ([]common.TestCase, error) {
+	testCases := []common.TestCase{}
+	queryOf := map[common.TestCase]string{}
+	for _, query := range c.queries {
+		cases, err := c.state.CTS.QueryTestCases(c.flags.Verbose, query)
+		if err != nil {
+			return nil, fmt.Errorf("failed to gather tests: %w", err)
+		}
+		for _, testCase := range cases {
+			if other, found := queryOf[testCase]; found {
+				return nil, fmt.Errorf("'%v' matches both '%v' and '%v'", testCase, other, query)
+			}
+			queryOf[testCase] = query
+		}
+		testCases = append(testCases, cases...)
+	}
+	return testCases, nil
 }
 
 // TODO(crbug.com/416755658): Add unittest coverage when exec is handled via
