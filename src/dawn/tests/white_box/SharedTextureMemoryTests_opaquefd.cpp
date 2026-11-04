@@ -47,6 +47,8 @@
 namespace dawn::native::vulkan {
 namespace {
 
+using ::testing::HasSubstr;
+
 template <typename CreateFn, typename... AdditionalChains>
 auto WithSTMOpaqueFDDescriptorFor(native::vulkan::Device* deviceVk,
                                   uint32_t size,
@@ -321,7 +323,7 @@ TEST_P(SharedTextureMemoryOpaqueFDValidationTest, RequiresCopyDst) {
                                  VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
                                  [&](const wgpu::SharedTextureMemoryDescriptor* desc) {
                                      ASSERT_DEVICE_ERROR_MSG(device.ImportSharedTextureMemory(desc),
-                                                             testing::HasSubstr("TRANSFER_DST"));
+                                                             HasSubstr("TRANSFER_DST"));
                                      return true;
                                  });
 }
@@ -385,29 +387,18 @@ TEST_P(SharedTextureMemoryOpaqueFDValidationTest, ImportErrors) {
             deviceVk, 4, VK_FORMAT_R8G8B8A8_UNORM, VK_IMAGE_USAGE_TRANSFER_DST_BIT,
             VkImageCreateFlagBits(0), dedicated,
             [&](const wgpu::SharedTextureMemoryDescriptor* desc) {
-                // Measure the injection points in a successful import.
-                ClearErrorInjector();
-                EnableErrorInjector();
-                device.ImportSharedTextureMemory(desc);
-                DisableErrorInjector();
-                const uint64_t failureCount = AcquireErrorInjectorCallCount();
-                EXPECT_GT(failureCount, 0u);
-                WaitForAllOperations();
-
-                for (uint64_t failureIndex = 0; failureIndex < failureCount; ++failureIndex) {
-                    SCOPED_TRACE(failureIndex);
-                    // ImportSharedTextureMemory turns unexpected backend errors into device loss.
-                    // Use a fresh device so every iteration reaches the intended failure point.
-                    wgpu::Device importDevice = CreateDevice();
-                    EXPECT_DEVICE_LOSS_ON(importDevice, {
-                        ClearErrorInjector();
-                        EnableErrorInjector();
-                        InjectErrorAt(failureIndex);
-                        importDevice.ImportSharedTextureMemory(desc);
-                        DisableErrorInjector();
-                    });
-                    EXPECT_EQ(AcquireErrorInjectorCallCount(), failureIndex + 1);
-                }
+                ExhaustiveErrorInjection([&](ErrorInjectionPhase phase) {
+                    if (phase == ErrorInjectionPhase::InjectError) {
+                        // ImportSharedTextureMemory turns unexpected backend errors into device
+                        // loss. Use a fresh device so every iteration reaches the intended failure
+                        // point.
+                        wgpu::Device importDevice = CreateDevice();
+                        EXPECT_DEVICE_LOSS_ON(importDevice,
+                                              importDevice.ImportSharedTextureMemory(desc));
+                    } else {
+                        device.ImportSharedTextureMemory(desc);
+                    }
+                });
                 return true;
             });
     }
@@ -469,7 +460,7 @@ TEST_P(SharedTextureMemoryOpaqueFDValidationTest, ImageFormatLimits) {
                 SCOPED_TRACE(test.error);
                 *test.value = 0;
                 ASSERT_DEVICE_ERROR_MSG(device.ImportSharedTextureMemory(&desc),
-                                        testing::HasSubstr(test.error));
+                                        HasSubstr(test.error));
                 createInfo = originalCreateInfo;
 
                 // There is no representable value above UINT32_MAX.
@@ -478,7 +469,7 @@ TEST_P(SharedTextureMemoryOpaqueFDValidationTest, ImageFormatLimits) {
                 }
                 *test.value = test.maximum + 1;
                 ASSERT_DEVICE_ERROR_MSG(device.ImportSharedTextureMemory(&desc),
-                                        testing::HasSubstr(test.error));
+                                        HasSubstr(test.error));
                 createInfo = originalCreateInfo;
             }
             for (VkSampleCountFlagBits samples :
@@ -491,14 +482,14 @@ TEST_P(SharedTextureMemoryOpaqueFDValidationTest, ImageFormatLimits) {
                 SCOPED_TRACE(samples);
                 createInfo.samples = samples;
                 ASSERT_DEVICE_ERROR_MSG(device.ImportSharedTextureMemory(&desc),
-                                        testing::HasSubstr("sampleCounts"));
+                                        HasSubstr("sampleCounts"));
             }
             for (uint32_t samples :
                  {0u, static_cast<uint32_t>(VK_SAMPLE_COUNT_1_BIT | VK_SAMPLE_COUNT_2_BIT)}) {
                 SCOPED_TRACE(samples);
                 createInfo.samples = static_cast<VkSampleCountFlagBits>(samples);
                 ASSERT_DEVICE_ERROR_MSG(device.ImportSharedTextureMemory(&desc),
-                                        testing::HasSubstr("sampleCounts"));
+                                        HasSubstr("sampleCounts"));
             }
             // Validation failures must leave the descriptor usable for another import.
             createInfo = originalCreateInfo;
@@ -527,15 +518,15 @@ TEST_P(SharedTextureMemoryOpaqueFDValidationTest, BGRA8UnormStorageRequirements)
                                  });
 
     // Test that excluding MUTABLE_FORMAT_BIT is invalid.
-    WithSTMOpaqueFDDescriptorFor(
-        deviceVk, 4, VK_FORMAT_B8G8R8A8_UNORM,
-        VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT |
-            VK_IMAGE_USAGE_STORAGE_BIT,
-        VkImageCreateFlagBits(0), false, [&](const wgpu::SharedTextureMemoryDescriptor* desc) {
-            ASSERT_DEVICE_ERROR_MSG(device.ImportSharedTextureMemory(desc),
-                                    testing::HasSubstr("MUTABLE_FORMAT_BIT"));
-            return true;
-        });
+    WithSTMOpaqueFDDescriptorFor(deviceVk, 4, VK_FORMAT_B8G8R8A8_UNORM,
+                                 VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT |
+                                     VK_IMAGE_USAGE_STORAGE_BIT,
+                                 VkImageCreateFlagBits(0), false,
+                                 [&](const wgpu::SharedTextureMemoryDescriptor* desc) {
+                                     ASSERT_DEVICE_ERROR_MSG(device.ImportSharedTextureMemory(desc),
+                                                             HasSubstr("MUTABLE_FORMAT_BIT"));
+                                     return true;
+                                 });
 
     // Test that excluding MUTABLE_FORMAT_BIT if STORAGE_BIT is not present is valid.
     WithSTMOpaqueFDDescriptorFor(deviceVk, 4, VK_FORMAT_B8G8R8A8_UNORM,
@@ -580,7 +571,7 @@ TEST_P(SharedTextureMemoryOpaqueFDValidationTest, ViewFormatRequirements) {
                 VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
             VkImageCreateFlagBits(0), false, [&](const wgpu::SharedTextureMemoryDescriptor* desc) {
                 ASSERT_DEVICE_ERROR_MSG(device.ImportSharedTextureMemory(desc),
-                                        testing::HasSubstr("MUTABLE_FORMAT_BIT"));
+                                        HasSubstr("MUTABLE_FORMAT_BIT"));
                 return true;
             });
 
@@ -637,7 +628,7 @@ TEST_P(SharedTextureMemoryOpaqueFDValidationTest, ViewFormatRequirements) {
                 VK_IMAGE_CREATE_MUTABLE_FORMAT_BIT, false,
                 [&](const wgpu::SharedTextureMemoryDescriptor* desc) {
                     ASSERT_DEVICE_ERROR_MSG(device.ImportSharedTextureMemory(desc),
-                                            testing::HasSubstr("VkImageFormatCreateInfo did not"));
+                                            HasSubstr("VkImageFormatCreateInfo did not"));
                     return true;
                 },
                 &imageFormatListInfo);
@@ -654,7 +645,7 @@ TEST_P(SharedTextureMemoryOpaqueFDValidationTest, ViewFormatRequirements) {
                 VK_IMAGE_CREATE_MUTABLE_FORMAT_BIT, false,
                 [&](const wgpu::SharedTextureMemoryDescriptor* desc) {
                     ASSERT_DEVICE_ERROR_MSG(device.ImportSharedTextureMemory(desc),
-                                            testing::HasSubstr("VkImageFormatCreateInfo did not"));
+                                            HasSubstr("VkImageFormatCreateInfo did not"));
                     return true;
                 },
                 &imageFormatListInfo);
@@ -671,7 +662,7 @@ TEST_P(SharedTextureMemoryOpaqueFDValidationTest, ViewFormatRequirements) {
                 VK_IMAGE_CREATE_MUTABLE_FORMAT_BIT, false,
                 [&](const wgpu::SharedTextureMemoryDescriptor* desc) {
                     ASSERT_DEVICE_ERROR_MSG(device.ImportSharedTextureMemory(desc),
-                                            testing::HasSubstr("VkImageFormatCreateInfo did not"));
+                                            HasSubstr("VkImageFormatCreateInfo did not"));
                     return true;
                 },
                 &imageFormatListInfo);

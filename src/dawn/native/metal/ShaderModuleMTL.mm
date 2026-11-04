@@ -37,6 +37,7 @@
 #include "src/dawn/native/Adapter.h"
 #include "src/dawn/native/BindGroupLayout.h"
 #include "src/dawn/native/CacheRequest.h"
+#include "src/dawn/native/ResourceTableDefaultResources.h"
 #include "src/dawn/native/Serializable.h"
 #include "src/dawn/native/TintUtils.h"
 #include "src/dawn/native/metal/BindGroupLayoutMTL.h"
@@ -168,19 +169,12 @@ std::unordered_map<uint32_t, tint::msl::writer::ArgumentBufferInfo> GenerateArgu
 
     std::unordered_map<uint32_t, tint::msl::writer::ArgumentBufferInfo> info = {};
 
-    uint32_t curBufferIdx = kArgumentBufferSlotMax;
     for (BindGroupIndex group : layout->GetBindGroupLayoutsMask()) {
         const BindGroupLayout* bgl = ToBackend(layout->GetBindGroupLayout(group));
 
-        // Note, both of these buffer index values need to match up to the value set in the
-        // CommandBufferMTL #argument-buffer-and-dynamic-offsets-buffer-indices
-        uint32_t argumentBufferIdx = curBufferIdx--;
-        // TODO(crbug.com/363031535): The dynamic offsets should all be in a single grouping
-        // which is in the immediates buffer.
-        std::optional<uint32_t> dynamicOffsetsBufferIdx;
-        if (uint32_t(bgl->GetDynamicBufferCount()) > 0u) {
-            dynamicOffsetsBufferIdx = curBufferIdx--;
-        }
+        uint32_t argumentBufferIdx, dynamicOffsetsBufferIdx;
+        std::tie(argumentBufferIdx, dynamicOffsetsBufferIdx) =
+            BindGroupSlotToArgumentBufferID(group);
 
         tint::msl::writer::ArgumentBufferInfo argumentBufferInfo{
             .id = argumentBufferIdx,
@@ -206,21 +200,20 @@ ResultOrUnknownError<CacheResult<MslCompilation>> TranslateToMSL(
     const ImmediateMask& pipelineImmediateMask) {
     bool useArgumentBuffers = device->IsToggleEnabled(Toggle::MetalUseArgumentBuffers);
 
-    tint::Bindings bindings =
-        GenerateBindingRemapping(layout, stage, [&](BindGroupIndex group, BindingIndex index) {
-            if (useArgumentBuffers) {
-                return tint::BindingPoint{
-                    .group = uint32_t{group},
-                    .binding = ToMTLArgumentBufferIndex(index),
-                };
-            } else {
-                return tint::BindingPoint{
-                    .group = 0,
-                    .binding = layout->GetBindingIndexInfo(stage)[group][index],
-                };
-            }
-        });
+    auto ToMSLBindPoint = [&](BindGroupIndex group, BindingIndex index) -> tint::BindingPoint {
+        if (useArgumentBuffers) {
+            return tint::BindingPoint{
+                .group = uint32_t{group},
+                .binding = ToMTLArgumentBufferIndex(index),
+            };
+        }
+        return tint::BindingPoint{
+            .group = 0,
+            .binding = layout->GetBindingIndexInfo(stage)[group][index],
+        };
+    };
 
+    tint::Bindings bindings = GenerateBindingRemapping(layout, stage, ToMSLBindPoint);
     tint::msl::writer::ArrayLengthOptions arrayLengthFromConstants =
         GenerateArrayLengthOptions(layout, stage);
 
@@ -274,6 +267,17 @@ ResultOrUnknownError<CacheResult<MslCompilation>> TranslateToMSL(
         }
     }
 
+    std::optional<tint::ResourceTableConfig> resourceTableConfig = std::nullopt;
+    if (layout->UsesResourceTable()) {
+        auto bindingTypeOrder = ResourceTableDefaultResources::GetOrder();
+        resourceTableConfig = tint::ResourceTableConfig{
+            .resource_table_binding = tint::BindingPoint(0, kResourceTableBindingSlot),
+            .storage_buffer_binding = tint::BindingPoint(0, kResourceTableStorageSlot),
+            .default_binding_type_order = {bindingTypeOrder.begin(), bindingTypeOrder.end()},
+            .binding_to_resource_type = GenerateBindingToResourceType(layout, ToMSLBindPoint),
+        };
+    }
+
     MslCompilationRequest req = {};
     req.stage = stage;
     req.shaderModuleHash = programmableStage.module->GetHash();
@@ -304,6 +308,7 @@ ResultOrUnknownError<CacheResult<MslCompilation>> TranslateToMSL(
     req.tintOptions.array_length_from_constants = std::move(arrayLengthFromConstants);
     req.tintOptions.pixel_local_attachments = std::move(pixelLocalAttachments);
     req.tintOptions.bindings = std::move(bindings);
+    req.tintOptions.resource_table = std::move(resourceTableConfig);
     req.tintOptions.vertex_pulling_config = std::move(vertexPullingTransformConfig);
 
     // Set internal immediate offsets

@@ -271,7 +271,8 @@ void Validator::CheckInstruction(const Instruction* inst) {
 }
 
 void Validator::CheckOverride(const Override* o) {
-    if (!CheckResultsAndOperands(o, Override::kNumResults, Override::kNumOperands)) {
+    if (!CheckResultsAndOperandRange(o, Override::kNumResults, Override::kMinOperands,
+                                     Override::kMaxOperands)) {
         return;
     }
 
@@ -304,7 +305,7 @@ void Validator::CheckOverride(const Override* o) {
 }
 
 void Validator::CheckVar(const Var* var) {
-    if (!CheckResultsAndOperands(var, Var::kNumResults, Var::kNumOperands)) {
+    if (!CheckResultsAndOperandRange(var, Var::kNumResults, Var::kMinOperands, Var::kMaxOperands)) {
         return;
     }
 
@@ -602,6 +603,9 @@ void Validator::CheckCoreBuiltinCall(const CoreBuiltinCall* call,
             if (!call->Result()->Type()->UnwrapPtr()->IsHostShareable()) {
                 AddError(call) << call->FriendlyName()
                                << " result store type must be host-shareable";
+            }
+            if (call->Result()->Type()->UnwrapPtr()->Is<core::type::Buffer>()) {
+                AddError(call) << call->FriendlyName() << " result store type must not be a buffer";
             }
         }
 

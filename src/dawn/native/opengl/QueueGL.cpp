@@ -27,6 +27,7 @@
 
 #include "src/dawn/native/opengl/QueueGL.h"
 
+#include <algorithm>
 #include <vector>
 
 #include "dawn/platform/DawnPlatform.h"
@@ -83,11 +84,14 @@ MaybeError Queue::SubmitImpl(Span<CommandBufferBase* const> commands) {
     Device* device = ToBackend(GetDevice());
     return device->EnqueueAndFlushGL([commands](const OpenGLFunctions& gl) -> MaybeError {
         {
-            TRACE_EVENT(DAWN_TRACE_CATEGORY("recording"), "CommandBufferGL::Execute");
+            TRACE_EVENT(DAWN_TRACE_CATEGORY("recording"), "CommandBufferGL::RecordCommands");
             for (CommandBufferBase* commandBuffer : commands) {
-                DAWN_TRY(ToBackend(commandBuffer)->Execute(gl));
+                DAWN_TRY(ToBackend(commandBuffer)->RecordCommands(gl));
             }
         }
+        // Results of the submitted work can become visible to the application (e.g. on present).
+        DAWN_TRY(
+            CheckPendingErrorBeforeUserVisibleData(gl, "Unchecked OpenGL calls in Queue::Submit"));
         return {};
     });
 }
@@ -164,6 +168,11 @@ MaybeError Queue::WriteTextureImpl(const TexelCopyTextureInfo& destination,
         APISubmit(SpanFromRef(commands));
         return {};
     }
+
+    // Synchronize with any shared texture memory fences and track the usage of the texture, like
+    // all other uses of textures do (see CommandBufferGL.cpp). The fence waits are enqueued so they
+    // are executed before the write below.
+    DAWN_TRY(ToBackend(destination.texture)->SynchronizeTextureBeforeUse());
 
     SubresourceRange range = GetSubresourcesAffectedByCopy(textureCopy, writeSizePixel);
     bool ensureInitialized = false;
@@ -279,6 +288,11 @@ ResultOrError<Ref<SharedFence>> Queue::GetOrCreateSharedFence(ExecutionSerial la
 
     return device->ExecuteGL(
         SubmitMode::Passive, [&](const OpenGLFunctions& gl) -> ResultOrError<Ref<SharedFence>> {
+            // The shared fence lets another API read the resources written so far, so check for
+            // unchecked GL errors first.
+            DAWN_TRY(CheckPendingErrorBeforeUserVisibleData(
+                gl, "Unchecked OpenGL calls before exporting a shared fence"));
+
             if (sync == nullptr) {
                 DisplayEGL* display = ToBackend(device->GetPhysicalDevice())->GetDisplay();
                 DAWN_TRY_ASSIGN(sync, WrappedEGLSync::Create(display, gl, requestedSyncType, {}));
@@ -320,7 +334,7 @@ ResultOrError<ExecutionSerial> Queue::CheckAndUpdateCompletedSerials() {
     // Queue::SubmitImpl(), it's safe to use ExecuteGL().
     return device->ExecuteGL(SubmitMode::Passive, [&](const OpenGLFunctions& gl) -> auto {
         return mFencesInFlight.Use([&](auto fencesInFlight) -> ResultOrError<ExecutionSerial> {
-            ExecutionSerial fenceSerial{0u};
+            ExecutionSerial fenceSerial = GetCompletedCommandSerial();
             while (!fencesInFlight->empty()) {
                 auto [sync, tentativeSerial] = fencesInFlight->front();
 
@@ -333,7 +347,7 @@ ResultOrError<ExecutionSerial> Queue::CheckAndUpdateCompletedSerials() {
                     return fenceSerial;
                 }
                 // Update fenceSerial since fence is ready.
-                fenceSerial = tentativeSerial;
+                fenceSerial = std::max(fenceSerial, tentativeSerial);
 
                 fencesInFlight->pop_front();
             }

@@ -58,6 +58,12 @@ std::vector<const char*> GetTogglesUsed(const wgpu::Adapter& adapter) {
     return FromAPI(adapter.Get())->GetTogglesUsed();
 }
 
+std::vector<const char*> GetDeviceTogglesUsed(const wgpu::Adapter& adapter,
+                                              const wgpu::DeviceDescriptor* descriptor) {
+    return FromAPI(adapter.Get())
+        ->GetDeviceTogglesUsed(FromAPI(reinterpret_cast<const WGPUDeviceDescriptor*>(descriptor)));
+}
+
 std::vector<const char*> GetTogglesUsed(WGPUDevice device) {
     return FromAPI(device)->GetTogglesUsed();
 }
@@ -116,6 +122,10 @@ WGPUDevice Adapter::CreateDevice(const wgpu::DeviceDescriptor* deviceDescriptor)
 
 WGPUDevice Adapter::CreateDevice(const WGPUDeviceDescriptor* deviceDescriptor) {
     return ToAPI(mImpl->APICreateDevice(FromAPI(deviceDescriptor)));
+}
+
+const gpu_info::DriverVersion& Adapter::GetDriverVersion() const {
+    return mImpl->GetPhysicalDevice()->GetDriverVersion();
 }
 
 void Adapter::ResetInternalDeviceForTesting() {

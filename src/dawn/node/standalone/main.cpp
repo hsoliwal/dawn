@@ -26,6 +26,7 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include <filesystem>
+#include <fstream>
 #include <iostream>
 #include <memory>
 #include <optional>
@@ -34,13 +35,23 @@
 #include <utility>
 #include <vector>
 
+#include "libplatform/libplatform.h"
 #include "src/dawn/node/Module.h"
 #include "src/dawn/node/napi_v8/napi_v8.h"
 #include "src/dawn/node/standalone/EventLoop.h"
 #include "src/dawn/node/standalone/Polyfills.h"
 #include "src/dawn/utils/CommandLineParser.h"
 
-#include "libplatform/libplatform.h"
+#if defined(DAWN_ENABLE_PARTITION_ALLOC)
+#include "partition_alloc/buildflags.h"  // nogncheck
+#if PA_BUILDFLAG(USE_PARTITION_ALLOC_AS_MALLOC)
+#include "partition_alloc/partition_alloc_constants.h"                                // nogncheck
+#include "partition_alloc/partition_root.h"                                           // nogncheck
+#include "partition_alloc/shim/allocator_shim.h"                                      // nogncheck
+#include "partition_alloc/shim/allocator_shim_default_dispatch_to_partition_alloc.h"  // nogncheck
+#include "partition_alloc/thread_cache.h"                                             // nogncheck
+#endif  // PA_BUILDFLAG(USE_PARTITION_ALLOC_AS_MALLOC)
+#endif  // defined(DAWN_ENABLE_PARTITION_ALLOC)
 
 namespace {
 
@@ -49,6 +60,19 @@ namespace {
 // as a bare package name.
 constexpr const char* kCmdlineScript = "./out-node/common/runtime/cmdline.js";
 
+// Appends each non-empty line of `in` to `queries`, without a trailing '\r'.
+void AppendQueryLines(std::istream& in, std::vector<std::string>* queries) {
+    std::string line;
+    while (std::getline(in, line)) {
+        if (!line.empty() && line.back() == '\r') {
+            line.pop_back();
+        }
+        if (!line.empty()) {
+            queries->push_back(std::move(line));
+        }
+    }
+}
+
 class StandaloneRunner {
   public:
     int Run(int argc, const char* argv[]) {
@@ -56,6 +80,7 @@ class StandaloneRunner {
             return *exit_code;
         }
 
+        ConfigurePartitionAlloc();
         InitializeV8();
         int exit_code = RunCts();
         DisposeV8();
@@ -79,8 +104,23 @@ class StandaloneRunner {
             return 0;
         }
 
-        if (!query_opt_.IsSet()) {
-            std::cerr << "Error: --query (-q) must be specified.\n\n";
+        queries_.assign(query_opt_.GetValue().begin(), query_opt_.GetValue().end());
+        if (query_file_opt_.IsSet()) {
+            const std::string& path = query_file_opt_.GetValue();
+            if (path == "-") {
+                AppendQueryLines(std::cin, &queries_);
+            } else {
+                std::ifstream file(path);
+                if (!file) {
+                    std::cerr << "Error: failed to open --query-file '" << path << "'.\n";
+                    return 1;
+                }
+                AppendQueryLines(file, &queries_);
+            }
+        }
+
+        if (queries_.empty()) {
+            std::cerr << "Error: --query (-q) or --query-file must be specified.\n\n";
             std::cerr << "Usage: " << argv[0] << " [options] --query <query>\n\nOptions:\n";
             parser_.PrintHelp(std::cerr);
             return 1;
@@ -160,8 +200,47 @@ class StandaloneRunner {
             js_args.push_back(flag);
         }
 
-        js_args.push_back(query_opt_.GetValue());
+        for (const std::string& query : queries_) {
+            js_args.push_back(query);
+        }
         return js_args;
+    }
+
+    // Configures PartitionAlloc's malloc partition for a command-line test runner. For background
+    // on buckets, slot spans, the empty slot span ring, and the thread cache, see:
+    // https://chromium.googlesource.com/chromium/src/+/main/base/allocator/partition_allocator/PartitionAlloc.md
+    void ConfigurePartitionAlloc() {
+#if defined(DAWN_ENABLE_PARTITION_ALLOC)
+#if PA_BUILDFLAG(USE_PARTITION_ALLOC_AS_MALLOC)
+        // Use denser buckets (8 per power-of-two order instead of 4) to reduce internal
+        // fragmentation, and disable security features (BackupRefPtr, MTE, quarantine, and zeroing
+        // on free) that add per-free overhead.
+        allocator_shim::ConfigurePartitions(
+            allocator_shim::EnableBrp(false), /*brp_extra_extras_size=*/0,
+            allocator_shim::EnableMemoryTagging(false),
+            partition_alloc::TagViolationReportingMode::kDisabled,
+            allocator_shim::BucketDistribution::kDenser,
+            partition_alloc::internal::SchedulerLoopQuarantineConfig(),
+            partition_alloc::internal::SchedulerLoopQuarantineConfig(),
+            partition_alloc::internal::SchedulerLoopQuarantineConfig(),
+            allocator_shim::EventuallyZeroFreedMemory(false));
+
+        // Enable the per-thread cache and raise its size limit from 512 B to 32 KiB
+        // (`kThreadCacheLargeSizeThreshold`) so more allocations use the thread-local freelists.
+        // This avoids acquiring a lock.
+        partition_alloc::PartitionRoot* root =
+            allocator_shim::internal::PartitionAllocMalloc::Allocator();
+        root->EnableThreadCacheIfSupported();
+        partition_alloc::ThreadCache::SetLargestCachedSize(
+            partition_alloc::kThreadCacheLargeSizeThreshold);
+
+        // Keep the maximum number of empty slot spans in the ring buffer before returning them to
+        // the OS.
+        root->AdjustSlotSpanRing(
+            static_cast<int16_t>(partition_alloc::internal::kMaxEmptySlotSpanRingSize),
+            /*dirty_bytes_shift=*/0);
+#endif  // PA_BUILDFLAG(USE_PARTITION_ALLOC_AS_MALLOC)
+#endif  // defined(DAWN_ENABLE_PARTITION_ALLOC)
     }
 
     void InitializeV8() {
@@ -259,10 +338,14 @@ class StandaloneRunner {
             .AddString("cts-dir",
                        "Directory containing the WebGPU CTS (default: third_party/webgpu-cts)")
             .Parameter("dir");
-    dawn::utils::CommandLineParser::StringOption& query_opt_ =
-        parser_.AddString("query", "CTS test query to run (e.g. 'webgpu:*')")
+    dawn::utils::CommandLineParser::StringListOption& query_opt_ =
+        parser_.AddStringList("query", "CTS test query to run (e.g. 'webgpu:*'); may be repeated")
             .ShortName('q')
-            .Parameter("query");
+            .Parameter("query")
+            .SplitOnComma(false);
+    dawn::utils::CommandLineParser::StringOption& query_file_opt_ =
+        parser_.AddString("query-file", "File of queries or test cases, one per line; '-' is stdin")
+            .Parameter("path");
     dawn::utils::CommandLineParser::BoolOption& verbose_opt_ =
         parser_.AddBool("verbose", "Print result/log of every test as it runs").ShortName('v');
     dawn::utils::CommandLineParser::BoolOption& quiet_opt_ =
@@ -285,6 +368,8 @@ class StandaloneRunner {
         parser_.AddStringList("dawn-flag", "Flag to set on dawn.node as <flag>=<value>")
             .Parameter("flag=value");
 
+    // The `--query` values followed by the lines of `--query-file`.
+    std::vector<std::string> queries_;
     std::unique_ptr<v8::Platform> platform_;
     std::unique_ptr<v8::ArrayBuffer::Allocator> allocator_;
     v8::Isolate* isolate_ = nullptr;

@@ -261,6 +261,7 @@ struct State {
             }
 
             // Only deal with vars which have binding points.
+            // Note, bp->binding is the remapped (MSL) binding point, not the WGSL binding point
             auto bp = var->BindingPoint();
             if (!bp.has_value()) {
                 continue;
@@ -518,6 +519,19 @@ struct State {
 
 Result<SuccessType> ArgumentBuffers(core::ir::Module& ir, const ArgumentBuffersConfig& config) {
     AssertValid(ir, "before msl.ArgumentBuffers");
+
+    std::unordered_set<BindingPoint> seen{};
+    for (const auto& [group, info] : config.group_to_argument_buffer_info) {
+        for (const auto member : info.struct_members) {
+            BindingPoint bp(group, member.id);
+            auto [_, inserted] = seen.insert(bp);
+            if (!inserted) {
+                std::stringstream ss;
+                ss << "Found duplicate binding point in argument buffer config: " << bp;
+                return Failure{ss.str()};
+            }
+        }
+    }
 
     TINT_CHECK_RESULT((State{config, ir}.Process()));
 
