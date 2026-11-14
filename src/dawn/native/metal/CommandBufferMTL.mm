@@ -55,7 +55,6 @@
 #include "src/dawn/native/metal/StorageBufferLengthTrackerMTL.h"
 #include "src/dawn/native/metal/TextureMTL.h"
 #include "src/dawn/native/metal/UtilsMetal.h"
-#include "src/dawn/native/metal/VertexBufferTrackerMTL.h"
 #include "src/utils/assert.h"
 #include "src/utils/compiler.h"
 
@@ -440,9 +439,12 @@ void EncodeEmptyBlitEncoderForWriteTimestamp(Device* device,
     if (cmd->querySet.Get() != nullptr) {
         QuerySet* querySet = ToBackend(cmd->querySet.Get());
         descriptor.sampleBufferAttachments[0].sampleBuffer = querySet->GetCounterSampleBuffer();
-        descriptor.sampleBufferAttachments[0].startOfEncoderSampleIndex = MTLCounterDontSample;
-        descriptor.sampleBufferAttachments[0].endOfEncoderSampleIndex =
+        // A macOS 26 Apple GPU driver bug causes kIOGPUCommandBufferCallbackErrorOutOfMemory
+        // when doing a blit pass with no timestamps followed by a blit pass with only an end
+        // timestamp (crbug.com/448394568). Use a start timestamp here to avoid that.
+        descriptor.sampleBufferAttachments[0].startOfEncoderSampleIndex =
             NSUInteger(querySet->GetSampleIndex(cmd->queryIndex));
+        descriptor.sampleBufferAttachments[0].endOfEncoderSampleIndex = MTLCounterDontSample;
 
         id<MTLBlitCommandEncoder> blit = commandContext->BeginBlit(descriptor);
         if (device->IsToggleEnabled(Toggle::MetalUseMockBlitEncoderForWriteTimestamp)) {
@@ -635,6 +637,15 @@ MaybeError CommandBuffer::RecordCommands(CommandRecordingContext* commandContext
                     RecordWriteBuffer(commandContext, mCommands.NextCommand<WriteBufferCmd>()));
                 break;
             }
+            case Command::SetResourceUsage: {
+                SetResourceUsageCmd* cmd = mCommands.NextCommand<SetResourceUsageCmd>();
+                UsageBindingResource resource{
+                    .buffer = cmd->buffer.Get(),
+                    .texture = cmd->texture.Get(),
+                };
+                cmd->table->SetResourceUsage(&resource, cmd->usage);
+                break;
+            }
             default: {
                 DAWN_UNREACHABLE();
             }
@@ -657,6 +668,15 @@ MaybeError CommandBuffer::RecordBeginComputePass(CommandRecordingContext* comman
 
     for (const SyncScopeResourceUsage& scope : resourceUsage.dispatchUsages) {
         DAWN_TRY(LazyClearSyncScope(scope, commandContext));
+    }
+    // A macOS 26 Apple GPU driver bug causes kIOGPUCommandBufferCallbackErrorOutOfMemory
+    // when doing a compute pass with no timestamps followed by a compute pass with only an end
+    // timestamp (crbug.com/448394568). Insert an empty blit encoder here so that can't happen.
+    if (ToBackend(GetDevice())->UseCounterSamplingAtStageBoundary() &&
+        cmd->timestampWrites.querySet.Get() != nullptr &&
+        cmd->timestampWrites.beginningOfPassWriteIndex == kQuerySetIndexUndefinedTyped &&
+        cmd->timestampWrites.endOfPassWriteIndex != kQuerySetIndexUndefinedTyped) {
+        commandContext->EnsureBlit();
     }
     commandContext->EndBlit();
 
@@ -784,9 +804,10 @@ MaybeError CommandBuffer::RecordComputePass(CommandRecordingContext* commandCont
 
             case Command::SetBindGroup: {
                 SetBindGroupCmd* cmd = mCommands.NextCommand<SetBindGroupCmd>();
-                ityp::span<BindingIndex, const uint32_t> dynamicOffsets;
-                if (cmd->dynamicOffsetCount != BindingIndex{0u}) {
-                    dynamicOffsets = mCommands.NextData<uint32_t>(cmd->dynamicOffsetCount);
+                ityp::span<DynamicOffsetsIndex, const BufferDynamicOffset> dynamicOffsets;
+                if (cmd->dynamicOffsetCount != DynamicOffsetsIndex{0u}) {
+                    dynamicOffsets =
+                        mCommands.NextData<BufferDynamicOffset>(cmd->dynamicOffsetCount);
                 }
 
                 bindGroups.OnSetBindGroup(cmd->index, ToBackend(cmd->group.Get()), dynamicOffsets);
@@ -838,6 +859,16 @@ MaybeError CommandBuffer::RecordComputePass(CommandRecordingContext* commandCont
             case Command::SetResourceTable: {
                 return DAWN_UNRECOVERABLE_ERROR(
                     "ResourceTable currently not supported in Compute passes on Metal.");
+            }
+
+            case Command::SetResourceUsage: {
+                SetResourceUsageCmd* cmd = mCommands.NextCommand<SetResourceUsageCmd>();
+                UsageBindingResource resource{
+                    .buffer = cmd->buffer.Get(),
+                    .texture = cmd->texture.Get(),
+                };
+                cmd->table->SetResourceUsage(&resource, cmd->usage);
+                break;
             }
 
             default: {
@@ -953,7 +984,6 @@ MaybeError CommandBuffer::RecordRenderPass(
     IndirectDrawIndex indirectDrawIndex{0u};
 
     StorageBufferLengthTracker storageBufferLengths{GetDevice()};
-    VertexBufferTracker vertexBuffers(&storageBufferLengths);
     BindGroupTracker bindGroups(&storageBufferLengths,
                                 GetDevice()->IsToggleEnabled(Toggle::MetalUseArgumentBuffers));
 
@@ -983,9 +1013,8 @@ MaybeError CommandBuffer::RecordRenderPass(
             case Command::Draw: {
                 DrawCmd* draw = iter->NextCommand<DrawCmd>();
 
-                vertexBuffers.Apply(encoder, lastPipeline, enableVertexPulling);
                 bindGroups.Apply(encoder);
-                storageBufferLengths.Apply(lastPipeline, enableVertexPulling);
+                storageBufferLengths.Apply(lastPipeline);
                 immediates.Apply(encoder, &storageBufferLengths);
 
                 // The instance count must be non-zero, otherwise no-op
@@ -1012,9 +1041,8 @@ MaybeError CommandBuffer::RecordRenderPass(
             case Command::DrawIndexed: {
                 DrawIndexedCmd* draw = iter->NextCommand<DrawIndexedCmd>();
 
-                vertexBuffers.Apply(encoder, lastPipeline, enableVertexPulling);
                 bindGroups.Apply(encoder);
-                storageBufferLengths.Apply(lastPipeline, enableVertexPulling);
+                storageBufferLengths.Apply(lastPipeline);
                 immediates.Apply(encoder, &storageBufferLengths);
 
                 // The index and instance count must be non-zero, otherwise no-op
@@ -1049,9 +1077,8 @@ MaybeError CommandBuffer::RecordRenderPass(
             case Command::DrawIndirect: {
                 DrawIndirectCmd* draw = iter->NextCommand<DrawIndirectCmd>();
 
-                vertexBuffers.Apply(encoder, lastPipeline, enableVertexPulling);
                 bindGroups.Apply(encoder);
-                storageBufferLengths.Apply(lastPipeline, enableVertexPulling);
+                storageBufferLengths.Apply(lastPipeline);
                 immediates.Apply(encoder, &storageBufferLengths);
 
                 IndirectDrawMetadata::ValidatedIndirectDraw validatedDraw =
@@ -1072,9 +1099,8 @@ MaybeError CommandBuffer::RecordRenderPass(
             case Command::DrawIndexedIndirect: {
                 DrawIndexedIndirectCmd* draw = iter->NextCommand<DrawIndexedIndirectCmd>();
 
-                vertexBuffers.Apply(encoder, lastPipeline, enableVertexPulling);
                 bindGroups.Apply(encoder);
-                storageBufferLengths.Apply(lastPipeline, enableVertexPulling);
+                storageBufferLengths.Apply(lastPipeline);
                 immediates.Apply(encoder, &storageBufferLengths);
 
                 IndirectDrawMetadata::ValidatedIndirectDraw validatedDraw =
@@ -1098,9 +1124,8 @@ MaybeError CommandBuffer::RecordRenderPass(
             case Command::MultiDrawIndirect: {
                 iter->NextCommand<MultiDrawIndirectCmd>();
 
-                vertexBuffers.Apply(encoder, lastPipeline, enableVertexPulling);
                 bindGroups.Apply(encoder);
-                storageBufferLengths.Apply(lastPipeline, enableVertexPulling);
+                storageBufferLengths.Apply(lastPipeline);
                 immediates.Apply(encoder, &storageBufferLengths);
 
                 ExecuteMultiDraw(multiDrawExecutions[multiDrawIndex], encoder);
@@ -1110,9 +1135,8 @@ MaybeError CommandBuffer::RecordRenderPass(
             case Command::MultiDrawIndexedIndirect: {
                 iter->NextCommand<MultiDrawIndexedIndirectCmd>();
 
-                vertexBuffers.Apply(encoder, lastPipeline, enableVertexPulling);
                 bindGroups.Apply(encoder);
-                storageBufferLengths.Apply(lastPipeline, enableVertexPulling);
+                storageBufferLengths.Apply(lastPipeline);
                 immediates.Apply(encoder, &storageBufferLengths);
 
                 ExecuteMultiDraw(multiDrawExecutions[multiDrawIndex], encoder);
@@ -1148,7 +1172,6 @@ MaybeError CommandBuffer::RecordRenderPass(
                     break;
                 }
 
-                vertexBuffers.OnSetPipeline(lastPipeline, newPipeline);
                 bindGroups.OnSetPipeline(newPipeline);
                 immediates.OnSetPipeline(newPipeline);
                 storageBufferLengths.OnSetPipeline(newPipeline);
@@ -1175,9 +1198,9 @@ MaybeError CommandBuffer::RecordRenderPass(
 
             case Command::SetBindGroup: {
                 SetBindGroupCmd* cmd = iter->NextCommand<SetBindGroupCmd>();
-                ityp::span<BindingIndex, const uint32_t> dynamicOffsets;
-                if (cmd->dynamicOffsetCount != BindingIndex{0u}) {
-                    dynamicOffsets = iter->NextData<uint32_t>(cmd->dynamicOffsetCount);
+                ityp::span<DynamicOffsetsIndex, const BufferDynamicOffset> dynamicOffsets;
+                if (cmd->dynamicOffsetCount != DynamicOffsetsIndex{0u}) {
+                    dynamicOffsets = iter->NextData<BufferDynamicOffset>(cmd->dynamicOffsetCount);
                 }
 
                 bindGroups.OnSetBindGroup(cmd->index, ToBackend(cmd->group.Get()), dynamicOffsets);
@@ -1205,9 +1228,30 @@ MaybeError CommandBuffer::RecordRenderPass(
 
             case Command::SetVertexBuffer: {
                 SetVertexBufferCmd* cmd = iter->NextCommand<SetVertexBufferCmd>();
+                auto buffer = ToBackend(cmd->buffer.Get());
+                buffer->TrackUsage();
+                id<MTLBuffer> mtlBuffer = buffer->GetMTLBuffer();
 
-                vertexBuffers.OnSetVertexBuffer(cmd->slot, ToBackend(cmd->buffer.Get()),
-                                                cmd->offset);
+                if (enableVertexPulling) {
+                    // The binding size for a vertex buffer must always be at least 4 so we can do
+                    // clamping.
+                    uint64_t bindingSize = std::max(4ull, cmd->buffer->GetSize() - cmd->offset);
+                    // (BufferMTL reserves an extra 4 bytes for us in case we're at the very end of
+                    // the buffer.)
+                    DAWN_ASSERT(cmd->offset + bindingSize <= cmd->buffer->GetAllocatedSize());
+
+                    // Insert lengths for vertex buffers bound as storage buffers
+                    storageBufferLengths.data[SingleShaderStage::Vertex]
+                                             [VertexBufferSlotToLengthArrayIndex(cmd->slot)] =
+                        checked_cast<BufferBindingSize32>(bindingSize);
+                    storageBufferLengths.dirtyStages |= wgpu::ShaderStage::Vertex;
+                }
+
+                NSUInteger offset = dchecked_cast<NSUInteger>(cmd->offset);
+                NSUInteger mtlIndex = uint32_t{VertexBufferSlotToMetalBufferIndex(cmd->slot)};
+                [encoder setVertexBuffers:&mtlBuffer
+                                  offsets:&offset
+                                withRange:NSMakeRange(mtlIndex, 1)];
                 break;
             }
 

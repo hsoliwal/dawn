@@ -35,6 +35,7 @@
 #include "partition_alloc/pointers/raw_ptr_exclusion.h"
 #include "src/dawn/common/Constants.h"
 #include "src/dawn/native/BindGroup.h"
+#include "src/dawn/native/IntegerTypes.h"
 #include "src/dawn/native/Pipeline.h"
 #include "src/dawn/native/PipelineLayout.h"
 #include "src/utils/compiler.h"
@@ -51,7 +52,7 @@ class BindGroupTrackerBase {
 
     void OnSetBindGroup(BindGroupIndex index,
                         BindGroupBase* bindGroup,
-                        ityp::span<BindingIndex, const uint32_t> dynamicOffsets) {
+                        ityp::span<DynamicOffsetsIndex, const BufferDynamicOffset> dynamicOffsets) {
         DAWN_ASSERT(index < kMaxBindGroupsTyped);
         DAWN_ASSERT(dynamicOffsets.size() <= kMaxDynamicOffsetsPerBindGroupTyped);
 
@@ -79,19 +80,21 @@ class BindGroupTrackerBase {
     void OnSetPipeline(PipelineBase* pipeline) { mPipeline = pipeline; }
 
   protected:
-    virtual bool AreLayoutsCompatible() {
+    virtual bool CanSkipDirtying() {
         return mLastAppliedPipeline != nullptr &&
                mLastAppliedPipeline->GetLayout() == mPipeline->GetLayout();
     }
 
-    ityp::span<BindingIndex, uint32_t> GetDynamicOffsets(BindGroupIndex index) {
-        return ityp::span<BindingIndex, uint32_t>(mDynamicOffsets[index].offsets)
+    ityp::span<DynamicOffsetsIndex, const BufferDynamicOffset> GetDynamicOffsets(
+        BindGroupIndex index) {
+        return ityp::span<DynamicOffsetsIndex, const BufferDynamicOffset>(
+                   mDynamicOffsets[index].offsets)
             .first(mDynamicOffsets[index].count);
     }
 
     // The Derived class should call this before it applies bind groups.
     void BeforeApply() {
-        if (AreLayoutsCompatible()) {
+        if (CanSkipDirtying()) {
             return;
         }
 
@@ -151,12 +154,13 @@ class BindGroupTrackerBase {
     // group uses none.
     static constexpr uint32_t kMaxDynamicOffsetsPerBindGroup =
         kMaxDynamicUniformBuffersPerPipelineLayout + kMaxDynamicStorageBuffersPerPipelineLayout;
-    static constexpr BindingIndex kMaxDynamicOffsetsPerBindGroupTyped{
+    static constexpr DynamicOffsetsIndex kMaxDynamicOffsetsPerBindGroupTyped{
         kMaxDynamicOffsetsPerBindGroup};
 
     struct BindingDynamicOffsets {
-        ityp::array<BindingIndex, uint32_t, kMaxDynamicOffsetsPerBindGroup> offsets = {};
-        BindingIndex count = {};
+        ityp::array<DynamicOffsetsIndex, BufferDynamicOffset, kMaxDynamicOffsetsPerBindGroup>
+            offsets = {};
+        DynamicOffsetsIndex count = {};
     };
 
     PerBindGroup<BindingDynamicOffsets> mDynamicOffsets = {};

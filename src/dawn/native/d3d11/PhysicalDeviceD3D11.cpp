@@ -183,6 +183,7 @@ void PhysicalDevice::InitializeSupportedFeaturesImpl() {
 
     EnableFeature(Feature::SharedTextureMemoryD3D11Texture2D);
     EnableFeature(Feature::SharedTextureMemoryDXGISharedHandle);
+    EnableFeature(Feature::SharedTextureMemoryDXGIY410);
 
     if (mDeviceInfo.supportsMonitoredFence || mDeviceInfo.supportsNonMonitoredFence) {
         EnableFeature(Feature::SharedFenceDXGISharedHandle);
@@ -372,13 +373,6 @@ void PhysicalDevice::SetupBackendDeviceToggles(dawn::platform::Platform* platfor
         if (gpu_info::IntelWindowsDriverVersion(GetDriverVersion()) < kKnownGoodDriverVersion) {
             deviceToggles->Default(Toggle::D3DSkipShaderOptimizations, true);
         }
-    }
-
-    if (gpu_info::IsIntel(vendorId) || gpu_info::IsQualcommACPI(vendorId) ||
-        gpu_info::IsQualcommPCI(vendorId)) {
-        // Workaround Intel (crbug.com/481934465) and Qualcomm (crbug.com/380487895) GPU
-        // hardware/driver limitations that corrupt buffer<->texture copies with a large row pitch.
-        deviceToggles->Default(Toggle::SplitBufferTextureCopyForOversizedRow, true);
     }
 
     // Enable the integer range analysis for shader robustness by default if the corresponding

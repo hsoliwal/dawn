@@ -65,10 +65,13 @@ class ComputePassEncoder final : public ProgrammableEncoder {
     void APISetPipeline(ComputePipelineBase* pipeline);
 
     void APISetResourceTable(ResourceTableBase* table);
+    void APISetResourceUsage(ResourceTableBase* table,
+                             const UsageBindingResource* resource,
+                             wgpu::ResourceTableUsage usage);
 
     void APISetBindGroup(uint32_t groupIndex,
                          BindGroupBase* group,
-                         ityp::span<BindingIndex, const uint32_t> dynamicOffsets = {});
+                         ityp::span<DynamicOffsetsIndex, const uint32_t> dynamicOffsets = {});
 
     void APISetImmediates(uint32_t offset, Span<const std::byte> data);
 

@@ -324,8 +324,8 @@ class DawnTestBase {
     explicit DawnTestBase(const AdapterTestParam& param);
     virtual ~DawnTestBase();
 
-    void SetUp();
-    void TearDown();
+    virtual void SetUp();
+    virtual void TearDown();
 
     bool IsD3D11() const;
     bool IsD3D12() const;
@@ -955,19 +955,19 @@ class DawnTestBase {
     } while (0)
 #define EXPECT_DEPRECATION_WARNING(statement) EXPECT_DEPRECATION_WARNINGS(statement, 1)
 
-template <typename Params = AdapterTestParam>
-class DawnTestWithParams : public DawnTestBase, public ::testing::TestWithParam<Params> {
+template <typename Params = AdapterTestParam, typename TestBase = DawnTestBase>
+class DawnTestWithParams : public TestBase, public ::testing::TestWithParam<Params> {
   protected:
     DawnTestWithParams();
     ~DawnTestWithParams() override = default;
 
-    void SetUp() override { DawnTestBase::SetUp(); }
+    void SetUp() override { TestBase::SetUp(); }
 
-    void TearDown() override { DawnTestBase::TearDown(); }
+    void TearDown() override { TestBase::TearDown(); }
 };
 
-template <typename Params>
-DawnTestWithParams<Params>::DawnTestWithParams() : DawnTestBase(this->GetParam()) {}
+template <typename Params, typename TestBase>
+DawnTestWithParams<Params, TestBase>::DawnTestWithParams() : TestBase(this->GetParam()) {}
 
 using DawnTest = DawnTestWithParams<>;
 
@@ -1036,7 +1036,7 @@ class Expectation {
     virtual ~Expectation() = default;
 
     // Will be called with the buffer or texture data the expectation should check.
-    virtual testing::AssertionResult Check(const void* data, size_t size) = 0;
+    virtual testing::AssertionResult Check(Span<const std::byte> data) = 0;
 };
 
 template <typename T>
@@ -1044,7 +1044,7 @@ class ExpectConstant : public Expectation {
   public:
     explicit ExpectConstant(T constant);
     uint32_t DataSize();
-    testing::AssertionResult Check(const void* data, size_t size) override;
+    testing::AssertionResult Check(Span<const std::byte> data) override;
 
   private:
     T mConstant;
@@ -1062,7 +1062,7 @@ class ExpectEq : public Expectation {
     explicit ExpectEq(T singleValue, T tolerance = {});
     ExpectEq(const T* values, const unsigned int count, T tolerance = {});
 
-    testing::AssertionResult Check(const void* data, size_t size) override;
+    testing::AssertionResult Check(Span<const std::byte> data) override;
 
   private:
     std::vector<T> mExpected;
@@ -1082,7 +1082,7 @@ class ExpectBetweenColors : public Expectation {
   public:
     // Inclusive for now
     ExpectBetweenColors(T value0, T value1);
-    testing::AssertionResult Check(const void* data, size_t size) override;
+    testing::AssertionResult Check(Span<const std::byte> data) override;
 
   private:
     std::vector<T> mLowerColorChannels;
@@ -1104,7 +1104,7 @@ class ExpectBetweenSnormTextureBounds : public Expectation {
     ExpectBetweenSnormTextureBounds(const std::vector<T>& expectedL,
                                     const std::vector<T>& expectedU)
         : expectedLower(expectedL), expectedUpper(expectedU) {}
-    testing::AssertionResult Check(const void* data, size_t size) override;
+    testing::AssertionResult Check(Span<const std::byte> data) override;
 
   private:
     std::vector<T> expectedLower;

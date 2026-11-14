@@ -89,6 +89,7 @@ enum class Command : uint32_t {
     SetIndexBuffer,
     SetVertexBuffer,
     SetResourceTable,
+    SetResourceUsage,
     WriteBuffer,
     WriteTimestamp,
 };
@@ -416,7 +417,7 @@ struct SetBindGroupCmd {
 
     BindGroupIndex index = BindGroupIndex(0u);
     Ref<BindGroupBase> group;
-    BindingIndex dynamicOffsetCount = BindingIndex{0u};
+    DynamicOffsetsIndex dynamicOffsetCount{};
 };
 
 struct SetImmediatesCmd {
@@ -452,6 +453,16 @@ struct SetResourceTableCmd {
     ~SetResourceTableCmd();
 
     Ref<ResourceTableBase> table;
+};
+
+struct SetResourceUsageCmd {
+    SetResourceUsageCmd();
+    ~SetResourceUsageCmd();
+
+    Ref<ResourceTableBase> table;
+    Ref<BufferBase> buffer;
+    Ref<TextureBase> texture;
+    wgpu::ResourceTableUsage usage;
 };
 
 struct WriteBufferCmd {

@@ -49,6 +49,7 @@
 #include "src/dawn/native/ResourceTable.h"
 #include "src/dawn/native/utils/NativeHelpers.h"
 #include "src/utils/compiler.h"
+#include "src/utils/span.h"
 
 namespace dawn::native {
 
@@ -543,9 +544,40 @@ void ComputePassEncoder::APISetResourceTable(ResourceTableBase* table) {
         "encoding %s.SetResourceTable(%s).", this, table);
 }
 
-void ComputePassEncoder::APISetBindGroup(uint32_t groupIndexIn,
-                                         BindGroupBase* group,
-                                         ityp::span<BindingIndex, const uint32_t> dynamicOffsets) {
+void ComputePassEncoder::APISetResourceUsage(ResourceTableBase* table,
+                                             const UsageBindingResource* resource,
+                                             wgpu::ResourceTableUsage usage) {
+    mEncodingContext->TryEncode(
+        this,
+        [&](CommandAllocator* allocator) -> MaybeValError {
+            if (GetDevice()->IsValidationEnabled()) {
+                DAWN_TRY(ValidateSetResourceUsage(GetDevice(), table, resource, usage));
+            }
+
+            mUsageTracker.AddReferencedResourceTable(table);
+            if (resource->buffer != nullptr) {
+                mUsageTracker.AddReferencedBuffer(resource->buffer);
+            }
+            if (resource->texture != nullptr) {
+                mUsageTracker.AddReferencedTexture(resource->texture);
+            }
+
+            SetResourceUsageCmd* cmd =
+                allocator->Allocate<SetResourceUsageCmd>(Command::SetResourceUsage);
+            cmd->table = table;
+            cmd->buffer = resource->buffer;
+            cmd->texture = resource->texture;
+            cmd->usage = usage;
+            return {};
+        },
+        "encoding %s.SetResourceUsage(%s, %p, %s).", this, table, resource, usage);
+}
+
+void ComputePassEncoder::APISetBindGroup(
+    uint32_t groupIndexIn,
+    BindGroupBase* group,
+    ityp::span<DynamicOffsetsIndex, const uint32_t> dynamicOffsetsIn) {
+    auto dynamicOffsets = CastIntSpan<const BufferDynamicOffset>(dynamicOffsetsIn);
     mEncodingContext->TryEncode(
         this,
         [&](CommandAllocator* allocator) -> MaybeValError {
@@ -629,7 +661,8 @@ void ComputePassEncoder::RestoreCommandBufferState(CommandBufferStateTracker sta
     for (auto i : Range(kMaxBindGroupsTyped)) {
         BindGroupBase* bg = state.GetBindGroup(i);
         if (bg != nullptr) {
-            APISetBindGroup(static_cast<uint32_t>(i), bg, state.GetDynamicOffsets(i));
+            APISetBindGroup(static_cast<uint32_t>(i), bg,
+                            CastIntSpan<const uint32_t>(state.GetDynamicOffsets(i)));
         }
     }
 

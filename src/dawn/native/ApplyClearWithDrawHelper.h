@@ -25,8 +25,8 @@
 // OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#ifndef SRC_DAWN_NATIVE_APPLYCLEARVALUEWITHDRAWHELPER_H_
-#define SRC_DAWN_NATIVE_APPLYCLEARVALUEWITHDRAWHELPER_H_
+#ifndef SRC_DAWN_NATIVE_APPLYCLEARWITHDRAWHELPER_H_
+#define SRC_DAWN_NATIVE_APPLYCLEARWITHDRAWHELPER_H_
 
 #include <vector>
 
@@ -45,29 +45,30 @@ class CommandEncoder;
 class RenderPassEncoder;
 struct RenderPassDescriptor;
 
-struct KeyOfApplyClearColorValueWithDrawPipelines {
+struct KeyOfApplyClearWithDrawPipelines {
     ColorAttachmentIndex colorAttachmentCount{};
     PerColorAttachment<wgpu::TextureFormat> colorTargetFormats{};
     ColorAttachmentMask colorTargetsToApplyClearColorValue;
     uint32_t sampleCount = 0;
     wgpu::TextureFormat depthStencilFormat = wgpu::TextureFormat::Undefined;
+    bool shouldClearDepth = false;
     bool hasPLS = false;
     uint64_t totalPixelLocalStorageSize = 0;
     std::vector<wgpu::PipelineLayoutStorageAttachment> plsAttachments;
 };
 
-struct KeyOfApplyClearColorValueWithDrawPipelinesHashFunc {
-    size_t operator()(KeyOfApplyClearColorValueWithDrawPipelines key) const;
+struct KeyOfApplyClearWithDrawPipelinesHashFunc {
+    size_t operator()(KeyOfApplyClearWithDrawPipelines key) const;
 };
-struct KeyOfApplyClearColorValueWithDrawPipelinesEqualityFunc {
-    bool operator()(KeyOfApplyClearColorValueWithDrawPipelines key1,
-                    const KeyOfApplyClearColorValueWithDrawPipelines key2) const;
+struct KeyOfApplyClearWithDrawPipelinesEqualityFunc {
+    bool operator()(KeyOfApplyClearWithDrawPipelines key1,
+                    const KeyOfApplyClearWithDrawPipelines key2) const;
 };
-using ApplyClearColorValueWithDrawPipelinesCache =
-    absl::flat_hash_map<KeyOfApplyClearColorValueWithDrawPipelines,
+using ApplyClearWithDrawPipelinesCache =
+    absl::flat_hash_map<KeyOfApplyClearWithDrawPipelines,
                         Ref<RenderPipelineBase>,
-                        KeyOfApplyClearColorValueWithDrawPipelinesHashFunc,
-                        KeyOfApplyClearColorValueWithDrawPipelinesEqualityFunc>;
+                        KeyOfApplyClearWithDrawPipelinesHashFunc,
+                        KeyOfApplyClearWithDrawPipelinesEqualityFunc>;
 
 class ClearWithDrawHelper {
   public:
@@ -81,13 +82,14 @@ class ClearWithDrawHelper {
     // Get the mask indicating the color attachments in the render pass that the workaround applies.
     static ColorAttachmentMask GetAppliedColorAttachments(const DeviceBase* device,
                                                           BeginRenderPassCmd* renderPass);
+    static bool IsDepthApplied(const DeviceBase* device, BeginRenderPassCmd* renderPass);
 
   private:
     bool mShouldRun = false;
-    KeyOfApplyClearColorValueWithDrawPipelines mKey;
-    Ref<BufferBase> mUniformBufferWithClearColorValues;
+    KeyOfApplyClearWithDrawPipelines mKey;
+    Ref<BufferBase> mUniformBufferWithClearValues;
 };
 
 }  // namespace dawn::native
 
-#endif
+#endif  // SRC_DAWN_NATIVE_APPLYCLEARWITHDRAWHELPER_H_

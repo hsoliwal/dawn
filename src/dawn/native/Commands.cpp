@@ -31,6 +31,7 @@
 #include "src/dawn/native/Buffer.h"
 #include "src/dawn/native/CommandAllocator.h"
 #include "src/dawn/native/ComputePipeline.h"
+#include "src/dawn/native/IntegerTypes.h"
 #include "src/dawn/native/QuerySet.h"
 #include "src/dawn/native/RenderBundle.h"
 #include "src/dawn/native/RenderPipeline.h"
@@ -212,8 +213,8 @@ void FreeCommands(CommandIterator* commands) {
             }
             case Command::SetBindGroup: {
                 SetBindGroupCmd* cmd = commands->NextCommand<SetBindGroupCmd>();
-                if (cmd->dynamicOffsetCount > BindingIndex{0u}) {
-                    commands->NextData<uint32_t>(cmd->dynamicOffsetCount);
+                if (cmd->dynamicOffsetCount > DynamicOffsetsIndex{0u}) {
+                    commands->NextData<BufferDynamicOffset>(cmd->dynamicOffsetCount);
                 }
                 cmd->~SetBindGroupCmd();
                 break;
@@ -237,6 +238,11 @@ void FreeCommands(CommandIterator* commands) {
             case Command::SetResourceTable: {
                 SetResourceTableCmd* cmd = commands->NextCommand<SetResourceTableCmd>();
                 cmd->~SetResourceTableCmd();
+                break;
+            }
+            case Command::SetResourceUsage: {
+                SetResourceUsageCmd* cmd = commands->NextCommand<SetResourceUsageCmd>();
+                cmd->~SetResourceUsageCmd();
                 break;
             }
             case Command::WriteBuffer: {
@@ -391,8 +397,8 @@ void SkipCommand(CommandIterator* commands, Command type) {
 
         case Command::SetBindGroup: {
             SetBindGroupCmd* cmd = commands->NextCommand<SetBindGroupCmd>();
-            if (cmd->dynamicOffsetCount > BindingIndex{0u}) {
-                commands->NextData<uint32_t>(cmd->dynamicOffsetCount);
+            if (cmd->dynamicOffsetCount > DynamicOffsetsIndex{0u}) {
+                commands->NextData<BufferDynamicOffset>(cmd->dynamicOffsetCount);
             }
             break;
         }
@@ -414,6 +420,11 @@ void SkipCommand(CommandIterator* commands, Command type) {
 
         case Command::SetResourceTable: {
             commands->NextCommand<SetResourceTableCmd>();
+            break;
+        }
+
+        case Command::SetResourceUsage: {
+            commands->NextCommand<SetResourceUsageCmd>();
             break;
         }
 
@@ -541,6 +552,9 @@ SetVertexBufferCmd::~SetVertexBufferCmd() = default;
 
 SetResourceTableCmd::SetResourceTableCmd() = default;
 SetResourceTableCmd::~SetResourceTableCmd() = default;
+
+SetResourceUsageCmd::SetResourceUsageCmd() = default;
+SetResourceUsageCmd::~SetResourceUsageCmd() = default;
 
 WriteBufferCmd::WriteBufferCmd() = default;
 WriteBufferCmd::~WriteBufferCmd() = default;

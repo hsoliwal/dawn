@@ -31,6 +31,7 @@ include("${CMAKE_CURRENT_SOURCE_DIR}/../../../third_party/CopyWindowsSDKDLL.cmak
 DawnJSONGenerator(
     TARGET "native_utils"
     PRINT_NAME "Dawn native utilities"
+    ADDIN_JSONS "${Dawn_SOURCE_DIR}/src/dawn/dawn_version.json"
     OUTPUT_HEADERS DAWN_NATIVE_UTILS_GEN_HEADERS
     OUTPUT_SOURCES DAWN_NATIVE_UTILS_GEN_SOURCES
 )
@@ -43,7 +44,7 @@ set(headers
 set(private_headers
     "${DAWN_NATIVE_UTILS_GEN_HEADERS}"
     "Adapter.h"
-    "ApplyClearColorValueWithDrawHelper.h"
+    "ApplyClearWithDrawHelper.h"
     "AsyncTask.h"
     "AttachmentState.h"
     "BackendConnection.h"
@@ -171,7 +172,7 @@ set(private_headers
 set(sources
     ${DAWN_NATIVE_UTILS_GEN_SOURCES}
     "Adapter.cpp"
-    "ApplyClearColorValueWithDrawHelper.cpp"
+    "ApplyClearWithDrawHelper.cpp"
     "AsyncTask.cpp"
     "AttachmentState.cpp"
     "BackendConnection.cpp"
@@ -550,7 +551,6 @@ if (DAWN_ENABLE_METAL)
         "metal/SwapChainMTL.h"
         "metal/TextureMTL.h"
         "metal/UtilsMetal.h"
-        "metal/VertexBufferTrackerMTL.h"
     )
     list(APPEND sources
         "metal/BackendMTL.mm"

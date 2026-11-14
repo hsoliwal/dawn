@@ -51,8 +51,8 @@ const (
 // More paths on the device, relative to the device directory.
 const (
 	deviceStamp      = "stamp"
-	deviceArchive    = "cts.zip"
 	deviceRunnerTemp = deviceRunner + ".new"
+	deviceCTSTemp    = deviceCTS + ".new"
 )
 
 // cmdlineMarker is the file that the runner and cmdline.js look for to find
@@ -76,10 +76,11 @@ func newStagedPart(name, dir string, files []string, deviceHashes map[string]str
 	return &stagedPart{name: name, hash: hash, stale: deviceHashes[name] != hash}, nil
 }
 
-// stage copies the runner and the CTS onto the device. The device directory
-// holds a stamp file with the hash of each part it has, and unless force is
-// set, a part whose hash matches is not copied again.
-func (t *adbTarget) stage(runner, ctsDir string, force bool) error {
+// stage copies the runner and the CTS onto the device: a CTS zip as it is, or
+// the files of a CTS directory packed into a zip. The device directory holds a
+// stamp file with the hash of each part it has, and unless force is set, a part
+// whose hash matches is not copied again.
+func (t *adbTarget) stage(runner, cts string, ctsZip, force bool) error {
 	start := time.Now()
 	deviceHashes := map[string]string{}
 	if !force {
@@ -92,11 +93,14 @@ func (t *adbTarget) stage(runner, ctsDir string, force bool) error {
 	if err != nil {
 		return err
 	}
-	files, err := ctsFiles(ctsDir)
-	if err != nil {
-		return err
+	ctsDir, files := filepath.Dir(cts), []string{filepath.Base(cts)}
+	if !ctsZip {
+		ctsDir = cts
+		if files, err = ctsFiles(cts); err != nil {
+			return err
+		}
 	}
-	ctsPart, err := newStagedPart("cts", ctsDir, files, deviceHashes)
+	ctsPart, err := newStagedPart("cts.zip", ctsDir, files, deviceHashes)
 	if err != nil {
 		return err
 	}
@@ -110,7 +114,12 @@ func (t *adbTarget) stage(runner, ctsDir string, force bool) error {
 		}
 	}
 	if ctsPart.stale {
-		if err := t.pushCTS(ctsDir, files); err != nil {
+		if ctsZip {
+			err = t.push(cts, t.devicePath(deviceCTSTemp))
+		} else {
+			err = t.pushCTS(cts, files)
+		}
+		if err != nil {
 			return err
 		}
 	}
@@ -161,11 +170,11 @@ func (t *adbTarget) pushCTS(ctsDir string, files []string) error {
 		return err
 	}
 	defer os.RemoveAll(tempDir)
-	archive := filepath.Join(tempDir, deviceArchive)
-	if err := writeArchive(archive, ctsDir, files); err != nil {
+	archive := filepath.Join(tempDir, deviceCTS)
+	if err := writeArchive(archive, ctsDir, files, fastDeflate); err != nil {
 		return err
 	}
-	return t.push(archive, t.devicePath(deviceArchive))
+	return t.push(archive, t.devicePath(deviceCTSTemp))
 }
 
 // install moves the pushed parts into place on the device. It first rewrites
@@ -191,11 +200,8 @@ func (t *adbTarget) install(parts ...*stagedPart) error {
 			commands = append(commands,
 				"mv "+deviceRunnerTemp+" "+deviceRunner,
 				"chmod 755 "+deviceRunner)
-		case "cts":
-			commands = append(commands,
-				"rm -rf "+deviceCTS,
-				"unzip -q "+deviceArchive+" -d "+deviceCTS,
-				"rm "+deviceArchive)
+		case "cts.zip":
+			commands = append(commands, "mv "+deviceCTSTemp+" "+deviceCTS)
 		}
 		commands = append(commands, "echo "+part.name+" "+part.hash+" >> "+deviceStamp)
 	}
@@ -252,16 +258,16 @@ func hashFiles(dir string, files []string) (string, error) {
 
 // writeArchive writes files, which are relative to dir, to a zip whose entry
 // names are those relative paths, so that the archive mirrors the CTS
-// directory. It has no directory entries, since unzip creates the missing
-// directories.
-func writeArchive(zipPath, dir string, files []string) error {
+// directory. It has no directory entries, since the runner infers the
+// directories from the entry names.
+func writeArchive(zipPath, dir string, files []string, compressor zip.Compressor) error {
 	f, err := os.Create(zipPath)
 	if err != nil {
 		return err
 	}
 	defer f.Close()
 	zw := zip.NewWriter(f)
-	zw.RegisterCompressor(zip.Deflate, fastDeflate)
+	zw.RegisterCompressor(zip.Deflate, compressor)
 	for _, file := range files {
 		if err := addFileToArchive(zw, dir, file); err != nil {
 			return err
@@ -274,6 +280,12 @@ func writeArchive(zipPath, dir string, files []string) error {
 // compressing harder takes longer than pushing the extra megabytes.
 func fastDeflate(out io.Writer) (io.WriteCloser, error) {
 	return flate.NewWriter(out, flate.BestSpeed)
+}
+
+// defaultDeflate returns a deflate writer at flate's default level, which packs
+// within a few percent of the best level in a fraction of the time.
+func defaultDeflate(out io.Writer) (io.WriteCloser, error) {
+	return flate.NewWriter(out, flate.DefaultCompression)
 }
 
 // addFileToArchive writes file, which is relative to dir, to zw. The entries
