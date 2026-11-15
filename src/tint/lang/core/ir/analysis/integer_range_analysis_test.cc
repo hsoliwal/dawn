@@ -1536,9 +1536,10 @@ TEST_F(IR_IntegerRangeAnalysisTest, AnalyzeLoopContinuing_Success_AddTwo) {
               analysis.GetBinaryToUpdateLoopControlVariableInContinuingBlockForTest(loop, idx));
 }
 
-TEST_F(IR_IntegerRangeAnalysisTest, AnalyzeLoopContinuing_Failure_MinusTwo) {
+TEST_F(IR_IntegerRangeAnalysisTest, AnalyzeLoopContinuing_Success_MinusTwo) {
     Var* idx = nullptr;
     Loop* loop = nullptr;
+    Binary* binary = nullptr;
     auto* func = b.Function("func", ty.void_());
     b.Append(func->Block(), [&] {
         loop = b.Loop();
@@ -1549,7 +1550,8 @@ TEST_F(IR_IntegerRangeAnalysisTest, AnalyzeLoopContinuing_Failure_MinusTwo) {
         b.Append(loop->Body(), [&] { b.ExitLoop(loop); });
         b.Append(loop->Continuing(), [&] {
             // idx -= 2u
-            b.Store(idx, b.Subtract(b.Load(idx), 2_u));
+            binary = b.Subtract(b.Load(idx), 2_u)->AsInstruction<Binary>();
+            b.Store(idx, binary);
             b.NextIteration(loop);
         });
         b.Return(func);
@@ -1582,7 +1584,7 @@ TEST_F(IR_IntegerRangeAnalysisTest, AnalyzeLoopContinuing_Failure_MinusTwo) {
 
     IntegerRangeAnalysis analysis(&mod);
     EXPECT_EQ(idx, analysis.GetLoopControlVariableFromConstantInitializerForTest(loop));
-    EXPECT_EQ(nullptr,
+    EXPECT_EQ(binary,
               analysis.GetBinaryToUpdateLoopControlVariableInContinuingBlockForTest(loop, idx));
 }
 
@@ -8919,6 +8921,222 @@ TEST_F(IR_IntegerRangeAnalysisTest, LoadFromLoopControlVariableWithRange) {
         std::get<IntegerRangeInfo::SignedIntegerRange>(load_idx_info.range);
     EXPECT_EQ(0, range_load_idx.min_bound);
     EXPECT_EQ(9, range_load_idx.max_bound);
+}
+
+TEST_F(IR_IntegerRangeAnalysisTest, LoadFromLoopControlVariableInExitCondition_Increasing) {
+    Var* idx = nullptr;
+    Load* condition_load = nullptr;
+    Load* body_load = nullptr;
+    auto* func = b.Function("func", ty.void_());
+    b.Append(func->Block(), [&] {
+        auto* loop = b.Loop();
+        b.Append(loop->Initializer(), [&] {
+            // idx = 0
+            idx = b.Var("idx", 0_i);
+            b.NextIteration(loop);
+        });
+        b.Append(loop->Body(), [&] {
+            // idx < 10
+            condition_load = b.Load(idx);
+            auto* binary = b.LessThan(condition_load, 10_i);
+            auto* ifelse = b.If(binary);
+            b.Append(ifelse->True(), [&] { b.ExitIf(ifelse); });
+            b.Append(ifelse->False(), [&] { b.ExitLoop(loop); });
+            body_load = b.Load(idx);
+            b.Continue(loop);
+        });
+        b.Append(loop->Continuing(), [&] {
+            // idx += 3
+            b.Store(idx, b.Add(b.Load(idx), 3_i));
+            b.NextIteration(loop);
+        });
+        b.Return(func);
+    });
+
+    EXPECT_EQ(Validate(mod), Success);
+
+    IntegerRangeAnalysis analysis(&mod);
+
+    // `idx` is 0, 3, 6 or 9 inside the loop body.
+    const IntegerRangeInfo& body_load_info = analysis.GetInfo(body_load);
+    ASSERT_TRUE(std::holds_alternative<IntegerRangeInfo::SignedIntegerRange>(body_load_info.range));
+    const auto& body_range = std::get<IntegerRangeInfo::SignedIntegerRange>(body_load_info.range);
+    EXPECT_EQ(0, body_range.min_bound);
+    EXPECT_EQ(9, body_range.max_bound);
+
+    // The exit condition also reads 12, which makes the loop exit.
+    const IntegerRangeInfo& condition_load_info = analysis.GetInfo(condition_load);
+    ASSERT_TRUE(
+        std::holds_alternative<IntegerRangeInfo::SignedIntegerRange>(condition_load_info.range));
+    const auto& condition_range =
+        std::get<IntegerRangeInfo::SignedIntegerRange>(condition_load_info.range);
+    EXPECT_EQ(0, condition_range.min_bound);
+    EXPECT_EQ(12, condition_range.max_bound);
+}
+
+TEST_F(IR_IntegerRangeAnalysisTest,
+       LoadFromLoopControlVariableInExitCondition_Increasing_InitializerExceedsCondition) {
+    Var* idx = nullptr;
+    Load* condition_load = nullptr;
+    Load* body_load = nullptr;
+    auto* func = b.ComputeFunction("func", 21_u, 1_u, 1_u);
+    auto* local_invocation_id = b.FunctionParam("local_invocation_id", mod.Types().vec3<u32>());
+    local_invocation_id->SetBuiltin(tint::core::BuiltinValue::kLocalInvocationId);
+    func->SetParams({local_invocation_id});
+
+    b.Append(func->Block(), [&] {
+        auto* loop = b.Loop();
+        b.Append(loop->Initializer(), [&] {
+            // idx = local_invocation_id.x, which is in [0, 20]
+            auto* init = b.Access(ty.u32(), local_invocation_id, 0_u);
+            idx = b.Var("idx", init);
+            b.NextIteration(loop);
+        });
+        b.Append(loop->Body(), [&] {
+            // idx < 10
+            condition_load = b.Load(idx);
+            auto* binary = b.LessThan(condition_load, 10_u);
+            auto* ifelse = b.If(binary);
+            b.Append(ifelse->True(), [&] { b.ExitIf(ifelse); });
+            b.Append(ifelse->False(), [&] { b.ExitLoop(loop); });
+            body_load = b.Load(idx);
+            b.Continue(loop);
+        });
+        b.Append(loop->Continuing(), [&] {
+            // idx++
+            b.Store(idx, b.Add(b.Load(idx), 1_u));
+            b.NextIteration(loop);
+        });
+        b.Return(func);
+    });
+
+    EXPECT_EQ(Validate(mod), Success);
+
+    IntegerRangeAnalysis analysis(&mod);
+
+    const IntegerRangeInfo& body_load_info = analysis.GetInfo(body_load);
+    ASSERT_TRUE(
+        std::holds_alternative<IntegerRangeInfo::UnsignedIntegerRange>(body_load_info.range));
+    const auto& body_range = std::get<IntegerRangeInfo::UnsignedIntegerRange>(body_load_info.range);
+    EXPECT_EQ(0u, body_range.min_bound);
+    EXPECT_EQ(9u, body_range.max_bound);
+
+    // The first exit condition check reads the initial value, which can be up to 20.
+    const IntegerRangeInfo& condition_load_info = analysis.GetInfo(condition_load);
+    ASSERT_TRUE(
+        std::holds_alternative<IntegerRangeInfo::UnsignedIntegerRange>(condition_load_info.range));
+    const auto& condition_range =
+        std::get<IntegerRangeInfo::UnsignedIntegerRange>(condition_load_info.range);
+    EXPECT_EQ(0u, condition_range.min_bound);
+    EXPECT_EQ(20u, condition_range.max_bound);
+}
+
+TEST_F(IR_IntegerRangeAnalysisTest, LoadFromLoopControlVariableInExitCondition_Decreasing) {
+    Var* idx = nullptr;
+    Load* condition_load = nullptr;
+    Load* body_load = nullptr;
+    auto* func = b.Function("func", ty.void_());
+    b.Append(func->Block(), [&] {
+        auto* loop = b.Loop();
+        b.Append(loop->Initializer(), [&] {
+            // idx = 10
+            idx = b.Var("idx", 10_i);
+            b.NextIteration(loop);
+        });
+        b.Append(loop->Body(), [&] {
+            // idx > 0
+            condition_load = b.Load(idx);
+            auto* binary = b.GreaterThan(condition_load, 0_i);
+            auto* ifelse = b.If(binary);
+            b.Append(ifelse->True(), [&] { b.ExitIf(ifelse); });
+            b.Append(ifelse->False(), [&] { b.ExitLoop(loop); });
+            body_load = b.Load(idx);
+            b.Continue(loop);
+        });
+        b.Append(loop->Continuing(), [&] {
+            // idx -= 4
+            b.Store(idx, b.Subtract(b.Load(idx), 4_i));
+            b.NextIteration(loop);
+        });
+        b.Return(func);
+    });
+
+    EXPECT_EQ(Validate(mod), Success);
+
+    IntegerRangeAnalysis analysis(&mod);
+
+    // `idx` is 10, 6 or 2 inside the loop body.
+    const IntegerRangeInfo& body_load_info = analysis.GetInfo(body_load);
+    ASSERT_TRUE(std::holds_alternative<IntegerRangeInfo::SignedIntegerRange>(body_load_info.range));
+    const auto& body_range = std::get<IntegerRangeInfo::SignedIntegerRange>(body_load_info.range);
+    EXPECT_EQ(2, body_range.min_bound);
+    EXPECT_EQ(10, body_range.max_bound);
+
+    // The exit condition also reads -2, which makes the loop exit.
+    const IntegerRangeInfo& condition_load_info = analysis.GetInfo(condition_load);
+    ASSERT_TRUE(
+        std::holds_alternative<IntegerRangeInfo::SignedIntegerRange>(condition_load_info.range));
+    const auto& condition_range =
+        std::get<IntegerRangeInfo::SignedIntegerRange>(condition_load_info.range);
+    EXPECT_EQ(-2, condition_range.min_bound);
+    EXPECT_EQ(10, condition_range.max_bound);
+}
+
+TEST_F(IR_IntegerRangeAnalysisTest,
+       LoadFromLoopControlVariableInExitCondition_Decreasing_InitializerBelowCondition) {
+    Var* idx = nullptr;
+    Load* condition_load = nullptr;
+    Load* body_load = nullptr;
+    auto* func = b.ComputeFunction("func", 21_u, 1_u, 1_u);
+    auto* local_invocation_id = b.FunctionParam("local_invocation_id", mod.Types().vec3<u32>());
+    local_invocation_id->SetBuiltin(tint::core::BuiltinValue::kLocalInvocationId);
+    func->SetParams({local_invocation_id});
+
+    b.Append(func->Block(), [&] {
+        auto* loop = b.Loop();
+        b.Append(loop->Initializer(), [&] {
+            // idx = local_invocation_id.x, which is in [0, 20]
+            auto* init = b.Access(ty.u32(), local_invocation_id, 0_u);
+            idx = b.Var("idx", init);
+            b.NextIteration(loop);
+        });
+        b.Append(loop->Body(), [&] {
+            // idx > 10
+            condition_load = b.Load(idx);
+            auto* binary = b.GreaterThan(condition_load, 10_u);
+            auto* ifelse = b.If(binary);
+            b.Append(ifelse->True(), [&] { b.ExitIf(ifelse); });
+            b.Append(ifelse->False(), [&] { b.ExitLoop(loop); });
+            body_load = b.Load(idx);
+            b.Continue(loop);
+        });
+        b.Append(loop->Continuing(), [&] {
+            // idx--
+            b.Store(idx, b.Subtract(b.Load(idx), 1_u));
+            b.NextIteration(loop);
+        });
+        b.Return(func);
+    });
+
+    EXPECT_EQ(Validate(mod), Success);
+
+    IntegerRangeAnalysis analysis(&mod);
+
+    const IntegerRangeInfo& body_load_info = analysis.GetInfo(body_load);
+    ASSERT_TRUE(
+        std::holds_alternative<IntegerRangeInfo::UnsignedIntegerRange>(body_load_info.range));
+    const auto& body_range = std::get<IntegerRangeInfo::UnsignedIntegerRange>(body_load_info.range);
+    EXPECT_EQ(11u, body_range.min_bound);
+    EXPECT_EQ(20u, body_range.max_bound);
+
+    // The final update reaches 10, but the first exit condition check can read as low as 0.
+    const IntegerRangeInfo& condition_load_info = analysis.GetInfo(condition_load);
+    ASSERT_TRUE(
+        std::holds_alternative<IntegerRangeInfo::UnsignedIntegerRange>(condition_load_info.range));
+    const auto& condition_range =
+        std::get<IntegerRangeInfo::UnsignedIntegerRange>(condition_load_info.range);
+    EXPECT_EQ(0u, condition_range.min_bound);
+    EXPECT_EQ(20u, condition_range.max_bound);
 }
 
 TEST_F(IR_IntegerRangeAnalysisTest, LoadFromLoopControlVariableWithoutRange) {
@@ -19109,6 +19327,85 @@ class IR_IntegerRangeAnalysisLoopStepTest : public IR_IntegerRangeAnalysisTest {
         return {i, j};
     }
 
+    /// Builds `for (var idx = init; idx >= rhs; idx -= step)` (`idx > rhs` when `!inclusive`) and
+    /// returns `idx`.
+    template <typename T>
+    Var* BuildDecreasingLoop(T init, T rhs, T step, bool inclusive = true) {
+        Var* idx = nullptr;
+        auto* func = b.Function("func", ty.void_());
+        b.Append(func->Block(), [&] {
+            auto* loop = b.Loop();
+            b.Append(loop->Initializer(), [&] {
+                idx = b.Var("idx", b.Constant(init));
+                b.NextIteration(loop);
+            });
+            b.Append(loop->Body(), [&] {
+                auto* cmp = inclusive ? b.GreaterThanEqual(b.Load(idx), b.Constant(rhs))
+                                      : b.GreaterThan(b.Load(idx), b.Constant(rhs));
+                auto* ifelse = b.If(cmp);
+                b.Append(ifelse->True(), [&] { b.ExitIf(ifelse); });
+                b.Append(ifelse->False(), [&] { b.ExitLoop(loop); });
+                b.Continue(loop);
+            });
+            b.Append(loop->Continuing(), [&] {
+                b.Store(idx, b.Subtract(b.Load(idx), b.Constant(step)));
+                b.NextIteration(loop);
+            });
+            b.Return(func);
+        });
+        EXPECT_EQ(Validate(mod), Success);
+        return idx;
+    }
+
+    /// Builds `for (var i = outer_init; i <= outer_rhs; i += 1) {
+    ///   for (var j = i; j >= inner_rhs; j -= inner_step) {}
+    /// }` and returns `i` and `j`.
+    template <typename T>
+    std::pair<Var*, Var*> BuildNestedDecreasingLoops(T outer_init,
+                                                     T outer_rhs,
+                                                     T inner_rhs,
+                                                     T inner_step) {
+        Var* i = nullptr;
+        Var* j = nullptr;
+        auto* func = b.Function("func", ty.void_());
+        b.Append(func->Block(), [&] {
+            auto* outer = b.Loop();
+            b.Append(outer->Initializer(), [&] {
+                i = b.Var("i", b.Constant(outer_init));
+                b.NextIteration(outer);
+            });
+            b.Append(outer->Body(), [&] {
+                auto* outer_if = b.If(b.LessThanEqual(b.Load(i), b.Constant(outer_rhs)));
+                b.Append(outer_if->True(), [&] { b.ExitIf(outer_if); });
+                b.Append(outer_if->False(), [&] { b.ExitLoop(outer); });
+
+                auto* inner = b.Loop();
+                b.Append(inner->Initializer(), [&] {
+                    j = b.Var("j", b.Load(i));
+                    b.NextIteration(inner);
+                });
+                b.Append(inner->Body(), [&] {
+                    auto* inner_if = b.If(b.GreaterThanEqual(b.Load(j), b.Constant(inner_rhs)));
+                    b.Append(inner_if->True(), [&] { b.ExitIf(inner_if); });
+                    b.Append(inner_if->False(), [&] { b.ExitLoop(inner); });
+                    b.Continue(inner);
+                });
+                b.Append(inner->Continuing(), [&] {
+                    b.Store(j, b.Subtract(b.Load(j), b.Constant(inner_step)));
+                    b.NextIteration(inner);
+                });
+                b.Continue(outer);
+            });
+            b.Append(outer->Continuing(), [&] {
+                b.Store(i, b.Add(b.Load(i), b.Constant(T(1))));
+                b.NextIteration(outer);
+            });
+            b.Return(func);
+        });
+        EXPECT_EQ(Validate(mod), Success);
+        return {i, j};
+    }
+
     void ExpectSigned(Var* idx, int64_t min, int64_t max) {
         IntegerRangeAnalysis analysis(&mod);
         const IntegerRangeInfo& info = analysis.GetInfo(idx);
@@ -19420,6 +19717,230 @@ TEST_F(IR_IntegerRangeAnalysisLoopStepTest, NestedLoops_Failure_Overflow_u32) {
     auto [i, j] = BuildNestedLoops(u32(kMax - 10u), u32(kMax - 8u), 1_u, u32(kMax), 3_u);
     ExpectUnsigned(i, kMax - 10u, kMax - 8u);
     ExpectNoRange(j);
+}
+
+// for (var idx = 10; idx >= 2; idx -= 4)
+// `idx` takes 10, 6, 2.
+TEST_F(IR_IntegerRangeAnalysisLoopStepTest, Decreasing_ConstantInit_ReachRHS_i32) {
+    Var* idx = BuildDecreasingLoop(10_i, 2_i, 4_i);
+    ExpectSigned(idx, 2, 10);
+}
+
+// for (var idx = 10u; idx >= 3u; idx -= 4u)
+// `idx` takes 10u, 6u.
+TEST_F(IR_IntegerRangeAnalysisLoopStepTest, Decreasing_ConstantInit_NotReachRHS_u32) {
+    Var* idx = BuildDecreasingLoop(10_u, 3_u, 4_u);
+    ExpectUnsigned(idx, 6u, 10u);
+}
+
+// for (var idx = 10; idx > 2; idx -= 4)
+// `idx` takes 10, 6.
+TEST_F(IR_IntegerRangeAnalysisLoopStepTest, Decreasing_ConstantInit_GreaterThan_i32) {
+    Var* idx = BuildDecreasingLoop(10_i, 2_i, 4_i, /* inclusive */ false);
+    ExpectSigned(idx, 6, 10);
+}
+
+// for (var idx = 9u; idx > 0u; idx -= 3u)
+// `idx` takes 9u, 6u, 3u, and `3u - 3u` doesn't underflow.
+TEST_F(IR_IntegerRangeAnalysisLoopStepTest,
+       Decreasing_ConstantInit_GreaterThan_MinMinusStepIsZero_u32) {
+    Var* idx = BuildDecreasingLoop(9_u, 0_u, 3_u, /* inclusive */ false);
+    ExpectUnsigned(idx, 3u, 9u);
+}
+
+// for (var idx = 5; idx >= 5; idx -= 3)
+TEST_F(IR_IntegerRangeAnalysisLoopStepTest, Decreasing_ConstantInit_InitEqualsRHS_i32) {
+    Var* idx = BuildDecreasingLoop(5_i, 5_i, 3_i);
+    ExpectSigned(idx, 5, 5);
+}
+
+// for (var idx = 4; idx >= 5; idx -= 3)
+// The loop body is never executed.
+TEST_F(IR_IntegerRangeAnalysisLoopStepTest, Decreasing_ConstantInit_Failure_InitLessThanRHS_i32) {
+    Var* idx = BuildDecreasingLoop(4_i, 5_i, 3_i);
+    ExpectNoRange(idx);
+}
+
+// for (var idx = -2; idx >= -10; idx -= 4)
+// `idx` takes -2, -6, -10.
+TEST_F(IR_IntegerRangeAnalysisLoopStepTest, Decreasing_ConstantInit_Negative_i32) {
+    Var* idx = BuildDecreasingLoop(-2_i, -10_i, 4_i);
+    ExpectSigned(idx, -10, -2);
+}
+
+// for (var idx = 5; idx >= 3; idx -= 10)
+// `idx` only takes 5.
+TEST_F(IR_IntegerRangeAnalysisLoopStepTest, Decreasing_ConstantInit_StepGreaterThanRange_i32) {
+    Var* idx = BuildDecreasingLoop(5_i, 3_i, 10_i);
+    ExpectSigned(idx, 5, 5);
+}
+
+// for (var idx = 5u; idx >= 3u; idx -= 10u)
+// `5u - 10u` underflows and still satisfies `idx >= 3u`.
+TEST_F(IR_IntegerRangeAnalysisLoopStepTest,
+       Decreasing_ConstantInit_Failure_StepGreaterThanRange_Underflow_u32) {
+    Var* idx = BuildDecreasingLoop(5_u, 3_u, 10_u);
+    ExpectNoRange(idx);
+}
+
+// for (var idx = 7u; idx >= 1u; idx -= 3u)
+// `idx` takes 7u, 4u, 1u, and `1u - 3u` underflows.
+TEST_F(IR_IntegerRangeAnalysisLoopStepTest, Decreasing_ConstantInit_Failure_Underflow_u32) {
+    Var* idx = BuildDecreasingLoop(7_u, 1_u, 3_u);
+    ExpectNoRange(idx);
+}
+
+// for (var idx = kMin + 9; idx >= kMin + 3; idx -= 3), where `kMin` is the minimum i32.
+// `idx` takes `kMin + 9`, `kMin + 6`, `kMin + 3`, and `(kMin + 3) - 3` doesn't underflow.
+TEST_F(IR_IntegerRangeAnalysisLoopStepTest, Decreasing_ConstantInit_MinMinusStepIsLowestValue_i32) {
+    constexpr int32_t kMin = i32::kLowestValue;
+    Var* idx = BuildDecreasingLoop(i32(kMin + 9), i32(kMin + 3), 3_i);
+    ExpectSigned(idx, kMin + 3, kMin + 9);
+}
+
+// for (var idx = kMin + 8; idx >= kMin + 2; idx -= 3), where `kMin` is the minimum i32.
+// `idx` takes `kMin + 8`, `kMin + 5`, `kMin + 2`, and `(kMin + 2) - 3` underflows.
+TEST_F(IR_IntegerRangeAnalysisLoopStepTest, Decreasing_ConstantInit_Failure_Underflow_i32) {
+    constexpr int32_t kMin = i32::kLowestValue;
+    Var* idx = BuildDecreasingLoop(i32(kMin + 8), i32(kMin + 2), 3_i);
+    ExpectNoRange(idx);
+}
+
+// for (var idx = -1; idx >= -10; idx -= 2147483647)
+// `idx` only takes -1, and `-1 - 2147483647` is exactly the minimum i32.
+TEST_F(IR_IntegerRangeAnalysisLoopStepTest, Decreasing_ConstantInit_StepIsHighestValue_i32) {
+    Var* idx = BuildDecreasingLoop(-1_i, -10_i, 2147483647_i);
+    ExpectSigned(idx, -1, -1);
+}
+
+// for (var idx = -2; idx >= -10; idx -= 2147483647)
+// `-2 - 2147483647` underflows.
+TEST_F(IR_IntegerRangeAnalysisLoopStepTest,
+       Decreasing_ConstantInit_Failure_StepIsHighestValue_i32) {
+    Var* idx = BuildDecreasingLoop(-2_i, -10_i, 2147483647_i);
+    ExpectNoRange(idx);
+}
+
+// for (var idx = 4294967295u; idx >= 1u; idx -= 4294967295u)
+// `idx` only takes 4294967295u, and `4294967295u - 4294967295u` is exactly 0u.
+TEST_F(IR_IntegerRangeAnalysisLoopStepTest, Decreasing_ConstantInit_StepIsHighestValue_u32) {
+    Var* idx = BuildDecreasingLoop(4294967295_u, 1_u, 4294967295_u);
+    ExpectUnsigned(idx, 4294967295u, 4294967295u);
+}
+
+// for (var idx = 4294967294u; idx >= 1u; idx -= 4294967295u)
+// `4294967294u - 4294967295u` underflows.
+TEST_F(IR_IntegerRangeAnalysisLoopStepTest,
+       Decreasing_ConstantInit_Failure_StepIsHighestValue_u32) {
+    Var* idx = BuildDecreasingLoop(4294967294_u, 1_u, 4294967295_u);
+    ExpectNoRange(idx);
+}
+
+// for (var i = 10; i <= 13; i += 1) {       // Range of `i` is [10, 13]
+//   for (var j = i; j >= 3; j -= 4) {}      // Range of `j` is [3, 13]
+// }
+// `(13 - 3) % 4 = 2` and `13 - 2 = 11` is in [10, 13], so `j` reaches 3 when `i == 11`.
+TEST_F(IR_IntegerRangeAnalysisLoopStepTest, NestedDecreasingLoops_InnerReachRHS_i32) {
+    auto [i, j] = BuildNestedDecreasingLoops(10_i, 13_i, 3_i, 4_i);
+    ExpectSigned(i, 10, 13);
+    ExpectSigned(j, 3, 13);
+}
+
+// for (var i = 9; i <= 10; i += 1) {        // Range of `i` is [9, 10]
+//   for (var j = i; j >= 3; j -= 4) {}      // Range of `j` is [5, 10]
+// }
+// `(10 - 3) % 4 = 3` and `10 - 3 = 7` is not in [9, 10], so the minimum value of `j` is reached
+// when `i == 9` (`9 - 4 = 5`).
+TEST_F(IR_IntegerRangeAnalysisLoopStepTest, NestedDecreasingLoops_InnerNotReachRHS_i32) {
+    auto [i, j] = BuildNestedDecreasingLoops(9_i, 10_i, 3_i, 4_i);
+    ExpectSigned(i, 9, 10);
+    ExpectSigned(j, 5, 10);
+}
+
+// for (var i = 11; i <= 13; i += 1) {       // Range of `i` is [11, 13]
+//   for (var j = i; j >= 3; j -= 4) {}      // Range of `j` is [3, 13]
+// }
+// `(13 - 3) % 4 = 2` and `13 - 2 = 11` is exactly the minimum value of `i`.
+TEST_F(IR_IntegerRangeAnalysisLoopStepTest, NestedDecreasingLoops_InnerReachRHS_Boundary_i32) {
+    auto [i, j] = BuildNestedDecreasingLoops(11_i, 13_i, 3_i, 4_i);
+    ExpectSigned(i, 11, 13);
+    ExpectSigned(j, 3, 13);
+}
+
+// for (var i = 12u; i <= 13u; i += 1u) {    // Range of `i` is [12u, 13u]
+//   for (var j = i; j >= 3u; j -= 4u) {}    // Range of `j` is [4u, 13u]
+// }
+// `(13 - 3) % 4 = 2` and `13 - 2 = 11` is not in [12, 13], so the minimum value of `j` is reached
+// when `i == 12` (`12 - 4 * 2 = 4`), and `4u - 4u` doesn't underflow.
+TEST_F(IR_IntegerRangeAnalysisLoopStepTest, NestedDecreasingLoops_InnerNotReachRHS_Boundary_u32) {
+    auto [i, j] = BuildNestedDecreasingLoops(12_u, 13_u, 3_u, 4_u);
+    ExpectUnsigned(i, 12u, 13u);
+    ExpectUnsigned(j, 4u, 13u);
+}
+
+// for (var i = 0; i <= 10; i += 1) {        // Range of `i` is [0, 10]
+//   for (var j = i; j >= 3; j -= 4) {}      // Range of `j` is [3, 10]
+// }
+// The minimum value of `i` is less than the RHS of the inner loop.
+TEST_F(IR_IntegerRangeAnalysisLoopStepTest, NestedDecreasingLoops_InitMinLessThanRHS_i32) {
+    auto [i, j] = BuildNestedDecreasingLoops(0_i, 10_i, 3_i, 4_i);
+    ExpectSigned(i, 0, 10);
+    ExpectSigned(j, 3, 10);
+}
+
+// for (var i = 0; i <= 2; i += 1) {         // Range of `i` is [0, 2]
+//   for (var j = i; j >= 5; j -= 2) {}      // The inner loop body is never executed.
+// }
+TEST_F(IR_IntegerRangeAnalysisLoopStepTest, NestedDecreasingLoops_Failure_InitMaxLessThanRHS_i32) {
+    auto [i, j] = BuildNestedDecreasingLoops(0_i, 2_i, 5_i, 2_i);
+    ExpectSigned(i, 0, 2);
+    ExpectNoRange(j);
+}
+
+// for (var i = 5u; i <= 7u; i += 1u) {      // Range of `i` is [5u, 7u]
+//   for (var j = i; j >= 1u; j -= 3u) {}
+// }
+// `j` can be `1u` (when `i == 7u`), and `1u - 3u` underflows.
+TEST_F(IR_IntegerRangeAnalysisLoopStepTest, NestedDecreasingLoops_Failure_Underflow_u32) {
+    auto [i, j] = BuildNestedDecreasingLoops(5_u, 7_u, 1_u, 3_u);
+    ExpectUnsigned(i, 5u, 7u);
+    ExpectNoRange(j);
+}
+
+TEST_F(IR_IntegerRangeAnalysisTest, LocalInvocationID_ConstOOBIndex) {
+    auto* func = b.ComputeFunction("my_func", 4_u, 3_u, 2_u);
+    auto* lid = b.FunctionParam("lid", mod.Types().vec3<u32>());
+    lid->SetBuiltin(tint::core::BuiltinValue::kLocalInvocationId);
+    func->SetParams({lid});
+
+    Value* access = nullptr;
+    b.Append(func->Block(), [&] {
+        access = b.Access(ty.u32(), lid, 5_u);
+        b.Return(func);
+    });
+
+    ASSERT_EQ(Validate(mod), Success);
+
+    IntegerRangeAnalysis analysis(&mod);
+    EXPECT_FALSE(analysis.GetInfo(access).IsValid());
+}
+
+TEST_F(IR_IntegerRangeAnalysisTest, LocalInvocationID_ConstNegativeIndex) {
+    auto* func = b.ComputeFunction("my_func", 4_u, 3_u, 2_u);
+    auto* lid = b.FunctionParam("lid", mod.Types().vec3<u32>());
+    lid->SetBuiltin(tint::core::BuiltinValue::kLocalInvocationId);
+    func->SetParams({lid});
+
+    Value* access = nullptr;
+    b.Append(func->Block(), [&] {
+        access = b.Access(ty.u32(), lid, -1_i);
+        b.Return(func);
+    });
+
+    ASSERT_EQ(Validate(mod), Success);
+
+    IntegerRangeAnalysis analysis(&mod);
+    EXPECT_FALSE(analysis.GetInfo(access).IsValid());
 }
 
 }  // namespace

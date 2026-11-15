@@ -57,18 +57,6 @@
 namespace tint::core::ir::analysis {
 
 namespace {
-/// Returns true if v is the integer constant 1.
-bool IsOne(const Value* v) {
-    if (auto* cv = v->As<Constant>()) {
-        return Switch(
-            cv->Type(),
-            [&](const core::type::I32*) { return cv->Value()->ValueAs<int32_t>() == 1; },
-            [&](const core::type::U32*) { return cv->Value()->ValueAs<uint32_t>() == 1; },
-            [&](const Default) -> bool { return false; });
-    }
-    return false;
-}
-
 bool IsConstantInteger(const Value* v) {
     if (auto* cv = v->As<Constant>()) {
         return cv->Type()->IsIntegerScalar();
@@ -86,6 +74,16 @@ bool IsPositiveConstantInteger(const Value* v) {
     return false;
 }
 
+// Returns true if `inst` is in `block` or in a block nested in `block`.
+bool IsInsideBlock(const Instruction* inst, const Block* block) {
+    for (const Block* b = inst->Block(); b; b = b->Parent() ? b->Parent()->Block() : nullptr) {
+        if (b == block) {
+            return true;
+        }
+    }
+    return false;
+}
+
 int64_t GetValueFromConstant(const Constant* value) {
     // Return an int64_t is enough as the type of `value` can only be either i32 or u32.
     [[maybe_unused]] bool is_i32_or_u32 = value->Type()->IsAnyOf<type::I32, type::U32>();
@@ -97,6 +95,9 @@ struct CompareOpAndConstRHS {
     BinaryOp op;
     int64_t const_rhs = 0;
     const Binary* binary = nullptr;
+    // The `load` instruction of the loop control variable used as the operand of the comparison
+    // operator.
+    const Load* load = nullptr;
 };
 
 IntegerRangeInfo ToIntegerRangeInfo(bool is_signed, int64_t min_value, int64_t max_value) {
@@ -146,16 +147,22 @@ struct IntegerRangeAnalysisImpl {
 
     IntegerRangeInfo GetInfo(const FunctionParam* param, uint32_t index) {
         const auto& range_info = integer_function_param_range_info_map_.Get(param);
-        if (!range_info) {
+        if (!range_info || index >= range_info.value->Length()) {
             return {};
         }
-        TINT_ASSERT(range_info.value->Length() > index);
         return (*range_info)[index];
     }
 
     IntegerRangeInfo GetInfo(const Var* var) { return integer_var_range_info_map_.GetOr(var, {}); }
 
     IntegerRangeInfo GetInfo(const Load* load) {
+        // The `load` instruction in the loop exit condition is executed before the exit condition
+        // is checked, so it can read values outside of the range of the loop control variable
+        // inside the loop.
+        if (auto condition_load_range = loop_condition_load_range_info_map_.Get(load)) {
+            return *condition_load_range;
+        }
+
         const InstructionResult* instruction = load->From()->As<InstructionResult>();
         if (!instruction) {
             return {};
@@ -179,11 +186,15 @@ struct IntegerRangeAnalysisImpl {
         if (access->Indices().size() > 1) {
             return {};
         }
-        if (!access->Indices()[0]->As<Constant>()) {
+        auto* const_idx = access->Indices()[0]->As<Constant>();
+        if (!const_idx) {
             return {};
         }
-        uint32_t index =
-            static_cast<uint32_t>(GetValueFromConstant(access->Indices()[0]->As<Constant>()));
+        int64_t const_value = GetValueFromConstant(const_idx);
+        if (const_value < 0) {
+            return {};
+        }
+        uint32_t index = static_cast<uint32_t>(const_value);
         return GetInfo(function_param, index);
     }
 
@@ -347,6 +358,27 @@ struct IntegerRangeAnalysisImpl {
             return;
         }
 
+        // The range of `index` computed below is only valid after the exit condition is checked
+        // and before `index` is updated in the continuing block. Verify that every load of `index`
+        // is in such a position or is the load in the exit condition (which gets a wider range),
+        // otherwise the load may read a value out of the range of `index`, e.g. a load between the
+        // update of `index` in the continuing block and the next check of the exit condition.
+        const Load* update_load = loop->Continuing()->Front()->As<Load>();
+        TINT_ASSERT(update_load);
+        for (auto& use : index->Result()->UsagesUnsorted()) {
+            const auto* load = use->instruction->As<Load>();
+            if (!load) {
+                // The only non-load usage is the store in the continuing block.
+                continue;
+            }
+            if (load == compare_info.load || load == update_load) {
+                continue;
+            }
+            if (!IsInsideBlock(load, loop->Body())) {
+                return;
+            }
+        }
+
         TINT_ASSERT(index->Initializer());
 
         // for (var i = init_value; ...), where `init_value` has a valid range [init_min, init_max].
@@ -368,8 +400,15 @@ struct IntegerRangeAnalysisImpl {
             init_max = static_cast<int64_t>(range.max_bound);
         }
 
-        // for (...; i += step) or for(...; i--) where `step` is a constant positive integer.
+        // for (...; i += step) or for(...; i -= step) where `step` is a constant positive integer.
         bool index_is_increasing = update->Op() == BinaryOp::kAdd;
+        const Constant* const_step = update->RHS()->As<Constant>();
+        if (const_step == nullptr) {
+            const_step = update->LHS()->As<Constant>();
+        }
+        TINT_ASSERT(const_step);
+        int64_t step = GetValueFromConstant(const_step);
+        TINT_ASSERT(step > 0);
 
         switch (compare_info.op) {
             case BinaryOp::kLessThanEqual: {
@@ -399,13 +438,6 @@ struct IntegerRangeAnalysisImpl {
                 if (!index_is_increasing || init_min > compare_info.const_rhs) {
                     break;
                 }
-                const Constant* const_step = update->RHS()->As<Constant>();
-                if (const_step == nullptr) {
-                    const_step = update->LHS()->As<Constant>();
-                }
-                TINT_ASSERT(const_step);
-                int64_t step = GetValueFromConstant(const_step);
-                TINT_ASSERT(step > 0);
 
                 // The maximum value of the init value inside loop body is the minimum of `init_max`
                 // and `const_rhs`.
@@ -435,29 +467,78 @@ struct IntegerRangeAnalysisImpl {
 
                 IntegerRangeInfo range_info = ToIntegerRangeInfo(is_signed, init_min, index_max);
                 integer_var_range_info_map_.Add(index, range_info);
+
+                // The load in the exit condition can also read `init_value` when it is greater
+                // than `const_rhs`, or the value `index + step` that makes the loop exit, which is
+                // at most `index_max + step`.
+                loop_condition_load_range_info_map_.Add(
+                    compare_info.load,
+                    ToIntegerRangeInfo(is_signed, init_min, std::max(init_max, index_max + step)));
                 break;
             }
             case BinaryOp::kGreaterThanEqual: {
-                // for (var index = init_value; index >= const_rhs; index--), where `init_value` has
-                // a range `[init_min, init_max]`, then the range of `index` will be:
-                // - When `const_rhs < init_min`, the range of `index` is `[const_rhs, init_max]` as
-                //   the loop can always be executed for all the values of `init_value`.
-                // - When `init_min <= const_rhs <= init_max`, the range of `index` is
-                //   `[const_rhs, init_max]` when `const_rhs <= init_value <= init_max`, and becomes
-                //   invalid when `init_value < const_rhs` as the loop won't be executed, so the
-                //   range
-                //    of `index` is `[const_rhs, init_max]`.
-                // - When `const_rhs > init_max`, the loop body will never be executed.
-                // Note that in `GetBinaryToCompareLoopControlVariableInLoopBody()` we disallow
-                // `const_rhs` to be the minimum value of `i32` or `u32`, so:
-                // - `index - 1` won't be underflow as `init_max` cannot be less than `const_rhs`.
-                // - `index >= const_rhs` can correctly exit when `init_max - 1` is the minimum
-                //   value of `i32` or `u32`.
-                if (!index_is_increasing && init_max >= compare_info.const_rhs) {
-                    IntegerRangeInfo range_info =
-                        ToIntegerRangeInfo(is_signed, compare_info.const_rhs, init_max);
-                    integer_var_range_info_map_.Add(index, range_info);
+                // for (var index = init_value; index >= const_rhs; index -= step), where
+                // `init_value` has a range `[init_min, init_max]` and `step` is a constant positive
+                // integer, then the range of `index` will be:
+                // - When `const_rhs > init_max`, the loop body can never be executed.
+                // - When `const_rhs <= init_max`, the loop body will only be executed when
+                //   `init_value >= const_rhs`, so the range of `index` must be the subrange in
+                //   `[const_rhs, init_max]`. For a given `init_value`, the minimum value of `index`
+                //   is `init_value - (init_value - const_rhs) / step * step`, so the minimum value
+                //   of `index` is the minimum of this expression over all the `init_value` in
+                //   `[max(init_min, const_rhs), init_max]`:
+                //   - Let `r = (init_max - const_rhs) % step`. If `init_max - r` is in the range
+                //     `[max(init_min, const_rhs), init_max]`, `index` can reach `const_rhs` exactly
+                //     when `init_value == init_max - r`.
+                //   - Otherwise `(init_value - const_rhs) % step` decreases as `init_value`
+                //     decreases in this range, so the minimum is reached when `init_value` is
+                //     `max(init_min, const_rhs)`.
+                //   For example, for (var index = init_value; index >= 3; index -= 4)
+                //   - If `init_value` is in range `[10, 13]`, then `r = (13 - 3) % 4 = 2`.
+                //     `init_max - r = 13 - 2 = 11` is in the range `[10, 13]`, so `index` can reach
+                //     `3` exactly when `init_value == 11` (`11 - 4 * 2 = 3`).
+                //   - If `init_value` is in range `[9, 10]`, then `r = (10 - 3) % 4 = 3`.
+                //     `init_max - r = 10 - 3 = 7` is not in the range `[9, 10]`, so the minimum
+                //     value of `index` (5) is reached when `init_value` is `9` (`9 - 4 = 5`).
+                if (index_is_increasing || init_max < compare_info.const_rhs) {
+                    break;
                 }
+
+                // The minimum value of the init value inside loop body is the maximum of `init_min`
+                // and `const_rhs`.
+                int64_t min_init_in_loop = std::max(init_min, compare_info.const_rhs);
+                int64_t remainder = (init_max - compare_info.const_rhs) % step;
+                int64_t index_min = 0;
+                if (init_max - min_init_in_loop >= remainder) {
+                    index_min = compare_info.const_rhs;
+                } else {
+                    index_min = min_init_in_loop -
+                                (min_init_in_loop - compare_info.const_rhs) / step * step;
+                }
+
+                // `index_min - step` must not be less than the minimum value of `i32` or `u32`.
+                // Otherwise `index` may be underflow and still satisfy `index >= const_rhs`, then
+                // `index` can take values outside of `[index_min, init_max]` and the loop may never
+                // exit, which is not supported in our implementation right now.
+                int64_t min_value = 0;
+                if (is_signed) {
+                    min_value = static_cast<int64_t>(i32::kLowestValue);
+                } else {
+                    min_value = static_cast<int64_t>(u32::kLowestValue);
+                }
+                if (index_min - step < min_value) {
+                    break;
+                }
+
+                IntegerRangeInfo range_info = ToIntegerRangeInfo(is_signed, index_min, init_max);
+                integer_var_range_info_map_.Add(index, range_info);
+
+                // The load in the exit condition can also read `init_value` when it is less than
+                // `const_rhs`, or the value `index - step` that makes the loop exit, which is at
+                // least `index_min - step`.
+                loop_condition_load_range_info_map_.Add(
+                    compare_info.load,
+                    ToIntegerRangeInfo(is_signed, std::min(init_min, index_min - step), init_max));
                 break;
             }
             default:
@@ -514,10 +595,13 @@ struct IntegerRangeAnalysisImpl {
     // instructions
     /// - The first instruction is to load the loop control variable into a temporary variable.
     /// - The second instruction is to add a constant positive integer to the temporary variable or
-    ///   to subtract one from the temporary variable.
+    ///   to subtract a constant positive integer from the temporary variable.
     /// - The third instruction is to store the value of the temporary variable into the loop
     ///   control variable.
     /// - The fourth instruction is `next_iteration`.
+    /// Note that `AnalyzeLoop()` also verifies that the loop control variable is not loaded after
+    /// it is updated in the continuing block, so relaxing the above requirements won't make the
+    /// computed range of the loop control variable incorrect.
     const Binary* GetBinaryToUpdateLoopControlVariableInContinuingBlock(
         const Loop* loop,
         const Var* loop_control_variable) {
@@ -546,7 +630,7 @@ struct IntegerRangeAnalysisImpl {
         // 2nd instruction:
         // %dst = add %src, step
         // or %dst = add step, %src
-        // or %dst = sub %src, 1
+        // or %dst = sub %src, step
         // where `step` is a constant positive integer.
         const auto* add_or_sub_from_loop_control_variable =
             load_from_loop_control_variable->next->As<Binary>();
@@ -569,8 +653,8 @@ struct IntegerRangeAnalysisImpl {
                 return nullptr;
             }
             case BinaryOp::kSubtract: {
-                // %dst = sub %src, 1
-                if (lhs == src && IsOne(rhs)) {
+                // %dst = sub %src, step
+                if (lhs == src && IsPositiveConstantInteger(rhs)) {
                     break;
                 }
                 return nullptr;
@@ -870,8 +954,10 @@ struct IntegerRangeAnalysisImpl {
             return compare_info;
         }
 
-        // Set `compare_info.binary` after the loop passes all the above checks.
+        // Set `compare_info.binary` and `compare_info.load` after the loop passes all the above
+        // checks.
         compare_info.binary = exit_condition_on_loop_control_variable;
+        compare_info.load = load_from_loop_control_variable;
         return compare_info;
     }
 
@@ -1525,6 +1611,7 @@ struct IntegerRangeAnalysisImpl {
     Hashmap<const FunctionParam*, Vector<IntegerRangeInfo, 3>, 4>
         integer_function_param_range_info_map_;
     Hashmap<const Var*, IntegerRangeInfo, 8> integer_var_range_info_map_;
+    Hashmap<const Load*, IntegerRangeInfo, 8> loop_condition_load_range_info_map_;
     Hashmap<const Constant*, IntegerRangeInfo, 8> integer_constant_range_info_map_;
     Hashmap<const Binary*, IntegerRangeInfo, 8> integer_binary_range_info_map_;
     Hashmap<const Convert*, IntegerRangeInfo, 8> integer_convert_range_info_map_;

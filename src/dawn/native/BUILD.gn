@@ -90,6 +90,7 @@ config("vulkan_utility_libraries_include") {
 
 dawn_json_generator("utils_gen") {
   target = "native_utils"
+  addin_jsons = [ "${dawn_root}/src/dawn/dawn_version.json" ]
   inputs = [
     "${dawn_root}/src/dawn/dawn_native.json",
     "${dawn_template_dir}/dawn/api_structs.h.tmpl",
@@ -235,8 +236,8 @@ source_set("sources") {
   sources += [
     "Adapter.cpp",
     "Adapter.h",
-    "ApplyClearColorValueWithDrawHelper.cpp",
-    "ApplyClearColorValueWithDrawHelper.h",
+    "ApplyClearWithDrawHelper.cpp",
+    "ApplyClearWithDrawHelper.h",
     "AsyncTask.cpp",
     "AsyncTask.h",
     "AttachmentState.cpp",
@@ -752,7 +753,6 @@ source_set("sources") {
       "metal/TextureMTL.mm",
       "metal/UtilsMetal.h",
       "metal/UtilsMetal.mm",
-      "metal/VertexBufferTrackerMTL.h",
     ]
 
     # If a "build with ARC" config is present, remove it.

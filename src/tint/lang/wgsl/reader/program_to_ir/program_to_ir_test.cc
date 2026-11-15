@@ -389,7 +389,7 @@ TEST_F(IR_FromProgramTest, Loop_WithContinuing_BreakIf) {
 }
 
 TEST_F(IR_FromProgramTest, Loop_Continuing_Body_Scope) {
-    auto* a = Decl(Let("a", Expr(true)));
+    auto* a = Decl(Let("a", ast::Type{}, Expr(true)));
     auto* ast_break_if = BreakIf("a");
     auto* ast_loop = Loop(Block(a), Block(ast_break_if));
     WrapInFunction(ast_loop);
@@ -1350,7 +1350,7 @@ TEST_F(IR_FromProgramTest, OverrideShortCircuitStatementInFunction) {
 
 TEST_F(IR_FromProgramTest, NonOverrideShortCircuitStatementInFunction) {
     auto* o0 = Override(Source{{1, 2}}, "a", ty.u32());
-    auto* o1 = Decl(Let("x", Expr(true)));
+    auto* o1 = Decl(Let("x", ast::Type{}, Expr(true)));
     auto* logical = LogicalAnd(o1->variable, Equal(Div(1_u, o0), 0_u));
     WrapInFunction(o1, logical);
 
@@ -1615,7 +1615,7 @@ fn main() {
     auto m = Build(wgsl);
     ASSERT_NE(m, Success);
     EXPECT_EQ(m.Failure().reason,
-              R"(test.wgsl:4:3 error: result type size (160000) exceeds maximum allowed (65536)
+              R"(test.wgsl:4:3 error: result type size (160000) exceeds maximum allowed (32768)
   var a: array<i32, 40000>;
   ^^^^^^^^^^^^^^^^^^^^^^^^
 )");
@@ -1642,13 +1642,13 @@ fn main() {
     // element constructor
     EXPECT_THAT(m.Failure().reason,
                 testing::HasSubstr(
-                    ":4:7 error: result type size (160000) exceeds maximum allowed (65536)"));
+                    ":4:7 error: result type size (160000) exceeds maximum allowed (32768)"));
 }
 
 TEST_F(IR_FromProgramTest, OperandTooLarge) {
     auto* wgsl = R"(
 struct S {
-  a : array<vec4f, 4097>,
+  a : array<vec4f, 2049>,
 }
 
 fn f(s : S) {}
@@ -1662,7 +1662,7 @@ fn main() {
     auto m = Build(wgsl);
     ASSERT_NE(m, Success);
     EXPECT_EQ(m.Failure().reason,
-              R"(test.wgsl:10:3 error: call: operand size (65552) exceeds maximum allowed (65536)
+              R"(test.wgsl:10:3 error: call: operand size (32784) exceeds maximum allowed (32768)
   f(S());
   ^
 )");

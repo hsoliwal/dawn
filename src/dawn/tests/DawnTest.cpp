@@ -121,17 +121,13 @@ using testing::MockCppCallback;
 DawnTestEnvironment* gTestEnv = nullptr;
 DawnTestBase* gCurrentTest = nullptr;
 
-template <typename T>
-void printBuffer(testing::AssertionResult& result, const T* buffer, const size_t count) {
-    static constexpr unsigned int kBytes = sizeof(T);
-
-    for (size_t index = 0; index < count; ++index) {
-        auto byteView = reinterpret_cast<const uint8_t*>(buffer + index);
-        for (unsigned int b = 0; b < kBytes; ++b) {
-            char buf[4];
-            snprintf(buf, sizeof(buf), "%02X ", byteView[b]);
-            result << buf;
+template <typename R>
+void printBuffer(testing::AssertionResult& result, const R& range) {
+    for (const auto& value : range) {
+        for (std::byte b : ByteSpanFromRef(value)) {
+            result << absl::StrFormat("%02X", std::to_integer<uint8_t>(b));
         }
+        result << " ";
     }
     result << "\n";
 }
@@ -437,19 +433,16 @@ void DawnTestEnvironment::ParseArgs(int argc, char** argv) {
         argLen = sizeof(kEnableBackendValidationSwitch) - 1;
         if (strncmp(argv[i], kEnableBackendValidationSwitch, argLen) == 0) {
             const char* level = argv[i] + argLen;
-            if (level[0] != '\0') {
-                if (strcmp(level, "=full") == 0) {
-                    mBackendValidationLevel = native::BackendValidationLevel::Full;
-                } else if (strcmp(level, "=partial") == 0) {
-                    mBackendValidationLevel = native::BackendValidationLevel::Partial;
-                } else if (strcmp(level, "=disabled") == 0) {
-                    mBackendValidationLevel = native::BackendValidationLevel::Disabled;
-                } else {
-                    ErrorLog() << "Invalid backend validation level" << level;
-                    DAWN_UNREACHABLE();
-                }
-            } else {
+            if (strcmp(level, "=full") == 0) {
+                mBackendValidationLevel = native::BackendValidationLevel::Full;
+            } else if (strcmp(level, "=partial") == 0) {
                 mBackendValidationLevel = native::BackendValidationLevel::Partial;
+            } else if (strcmp(level, "=disabled") == 0) {
+                mBackendValidationLevel = native::BackendValidationLevel::Disabled;
+            } else {
+                ErrorLog() << "Invalid backend validation level '" << level
+                           << "' (must be =full, =partial, or =disabled)";
+                DAWN_UNREACHABLE();
             }
             continue;
         }
@@ -598,7 +591,7 @@ void DawnTestEnvironment::ParseArgs(int argc, char** argv) {
                    "    [--enable-toggles=toggles] [--disable-toggles=toggles]\n"
                    "    [--backend=x[,y...]]\n"
                    "    [--adapter-vendor-id=x] "
-                   "[--enable-backend-validation[=full,partial,disabled]]\n"
+                   "[--enable-backend-validation=(full|partial|disabled)]\n"
                    "    [--exclusive-device-type-preference=integrated,cpu,discrete]\n\n"
                    "  -w, --use-wire: Run the tests through the wire (defaults to no wire)\n"
                    "  -s, --enable-implicit-device-sync: Run the tests with implicit device "
@@ -1062,14 +1055,13 @@ DawnTestBase::DawnTestBase(const AdapterTestParam& param) : mParam(param) {
                 native::GetProcs().adapterGetInfo(candidate.Get(), &info);
 
                 const auto& testParam = gCurrentTest->mParam;
-                bool result =
-                    (testParam.adapterProperties.selected &&
-                     info.deviceID == testParam.adapterProperties.deviceID &&
-                     info.vendorID == testParam.adapterProperties.vendorID &&
-                     info.adapterType ==
-                         static_cast<WGPUAdapterType>(testParam.adapterProperties.adapterType) &&
-                     DAWN_UNSAFE_TODO(std::string_view(info.device.data, info.device.length)) ==
-                         testParam.adapterProperties.name);
+                bool result = (testParam.adapterProperties.selected &&
+                               info.deviceID == testParam.adapterProperties.deviceID &&
+                               info.vendorID == testParam.adapterProperties.vendorID &&
+                               info.adapterType == static_cast<WGPUAdapterType>(
+                                                       testParam.adapterProperties.adapterType) &&
+                               std::string_view(wgpu::StringView(info.device)) ==
+                                   testParam.adapterProperties.name);
                 native::GetProcs().adapterInfoFreeMembers(info);
                 return result;
             });
@@ -2379,18 +2371,17 @@ void DawnTestBase::ResolveExpectations() {
     for (const auto& expectation : mDeferredExpectations) {
         EXPECT_TRUE(mReadbackSlots[expectation.readbackSlot].mappedData.data() != nullptr);
 
-        // Get a pointer to the mapped copy of the data for the expectation.
+        // Get the mapped copy of the data for the expectation.
         const auto& slot = mReadbackSlots[expectation.readbackSlot];
-        const char* data = ReinterpretSpan<const char>(slot.mappedData).data();
+        Span<const std::byte> data = slot.mappedData;
 
         // Handle the case where the device was lost so the expected data couldn't be read back.
-        if (data == nullptr) {
+        if (data.data() == nullptr) {
             InfoLog() << "Skipping deferred expectation because the device was lost";
             continue;
         }
 
-        uint32_t size;
-        std::vector<char> packedData;
+        std::vector<std::byte> packedData;
         if (expectation.rowBytes != expectation.bytesPerRow) {
             DAWN_ASSERT(expectation.bytesPerRow > expectation.rowBytes);
             uint32_t rowCount =
@@ -2403,14 +2394,13 @@ void DawnTestBase::ResolveExpectations() {
                         data[i + r * expectation.bytesPerRow];
                 }
             }
-            data = packedData.data();
-            size = packedSize;
+            data = packedData;
         } else {
-            size = expectation.size;
+            data = data.first(expectation.size);
         }
 
         // Get the result for the expectation and add context to failures
-        testing::AssertionResult result = expectation.expectation->Check(data, size);
+        testing::AssertionResult result = expectation.expectation->Check(data);
         if (!result) {
             result << " Expectation created at " << expectation.file << ":" << expectation.line
                    << "\n";
@@ -2497,10 +2487,10 @@ void DawnTestBase::CheckReplayedReadbackBuffers(std::span<ReadbackSlot> existing
                     << static_cast<uint32_t>(std::to_integer<uint8_t>(replayData[i])) << "\n";
                 if (readback.buffer.GetSize() <= 1024) {
                     result << "Original:\n";
-                    printBuffer(result, originalData.data(), originalData.size());
+                    printBuffer(result, originalData);
 
                     result << "Replayed:\n";
-                    printBuffer(result, replayData.data(), replayData.size());
+                    printBuffer(result, replayData);
                 }
                 EXPECT_TRUE(result) << " Failure at Capture Replay Check";
                 break;
@@ -2646,11 +2636,11 @@ uint32_t ExpectConstant<T>::DataSize() {
 }
 
 template <typename T>
-testing::AssertionResult ExpectConstant<T>::Check(const void* data, size_t size) {
-    DAWN_ASSERT(size % DataSize() == 0 && size > 0);
-    const T* actual = static_cast<const T*>(data);
+testing::AssertionResult ExpectConstant<T>::Check(Span<const std::byte> data) {
+    DAWN_ASSERT(!data.empty());
+    auto actual = ReinterpretSpan<const T>(data);
 
-    for (size_t i = 0; i < size / DataSize(); ++i) {
+    for (size_t i = 0; i < actual.size(); ++i) {
         if (actual[i] != mConstant) {
             return testing::AssertionFailure()
                    << "Expected data[" << i << "] to match constant value " << mConstant
@@ -2664,9 +2654,9 @@ testing::AssertionResult ExpectConstant<T>::Check(const void* data, size_t size)
 template class ExpectConstant<float>;
 
 template <typename T, typename U>
-testing::AssertionResult ExpectEq<T, U>::Check(const void* data, size_t size) {
-    DAWN_ASSERT(size == sizeof(U) * mExpected.size());
-    const U* actual = static_cast<const U*>(data);
+testing::AssertionResult ExpectEq<T, U>::Check(Span<const std::byte> data) {
+    auto actual = ReinterpretSpan<const U>(data);
+    DAWN_ASSERT(actual.size() == mExpected.size());
 
     for (size_t i = 0; i < mExpected.size(); ++i) {
         testing::AssertionResult check = CheckImpl(mExpected[i], actual[i], mTolerance);
@@ -2677,10 +2667,10 @@ testing::AssertionResult ExpectEq<T, U>::Check(const void* data, size_t size) {
 
             if (mExpected.size() <= 1024) {
                 result << "Expected:\n";
-                printBuffer(result, mExpected.data(), mExpected.size());
+                printBuffer(result, mExpected);
 
                 result << "Actual:\n";
-                printBuffer(result, actual, mExpected.size());
+                printBuffer(result, actual);
             }
 
             return result;
@@ -2719,13 +2709,13 @@ ExpectBetweenColors<T>::ExpectBetweenColors(T value0, T value1) {
 }
 
 template <typename T>
-testing::AssertionResult ExpectBetweenColors<T>::Check(const void* data, size_t size) {
-    DAWN_ASSERT(size == sizeof(T) * mLowerColorChannels.size());
+testing::AssertionResult ExpectBetweenColors<T>::Check(Span<const std::byte> data) {
     DAWN_ASSERT(mHigherColorChannels.size() == mLowerColorChannels.size());
     DAWN_ASSERT(mValues0.size() == mValues1.size());
     DAWN_ASSERT(mValues0.size() == mLowerColorChannels.size());
 
-    const T* actual = static_cast<const T*>(data);
+    auto actual = ReinterpretSpan<const T>(data);
+    DAWN_ASSERT(actual.size() == mLowerColorChannels.size());
 
     for (size_t i = 0; i < mLowerColorChannels.size(); ++i) {
         if (!(actual[i] >= mLowerColorChannels[i] && actual[i] <= mHigherColorChannels[i])) {
@@ -2736,12 +2726,12 @@ testing::AssertionResult ExpectBetweenColors<T>::Check(const void* data, size_t 
 
             if (mLowerColorChannels.size() <= 1024) {
                 result << "Expected between:\n";
-                printBuffer(result, mValues0.data(), mLowerColorChannels.size());
+                printBuffer(result, mValues0);
                 result << "and\n";
-                printBuffer(result, mValues1.data(), mLowerColorChannels.size());
+                printBuffer(result, mValues1);
 
                 result << "Actual:\n";
-                printBuffer(result, actual, mLowerColorChannels.size());
+                printBuffer(result, actual);
             }
 
             return result;
@@ -2754,11 +2744,11 @@ testing::AssertionResult ExpectBetweenColors<T>::Check(const void* data, size_t 
 template class ExpectBetweenColors<utils::RGBA8>;
 
 template <typename T>
-testing::AssertionResult ExpectBetweenSnormTextureBounds<T>::Check(const void* data, size_t size) {
-    DAWN_ASSERT(size == sizeof(T) * expectedLower.size());
+testing::AssertionResult ExpectBetweenSnormTextureBounds<T>::Check(Span<const std::byte> data) {
     DAWN_ASSERT(expectedLower.size() == expectedUpper.size());
 
-    const T* actual = static_cast<const T*>(data);
+    auto actual = ReinterpretSpan<const T>(data);
+    DAWN_ASSERT(actual.size() == expectedLower.size());
 
     for (size_t i = 0; i < expectedLower.size(); ++i) {
         if (!(actual[i] >= expectedLower[i] && actual[i] <= expectedUpper[i])) {

@@ -46,6 +46,7 @@
 #include "src/dawn/native/Error.h"
 #include "src/dawn/native/ExternalTexture.h"
 #include "src/dawn/native/ImmediatesTracker.h"
+#include "src/dawn/native/IntegerTypes.h"
 #include "src/dawn/native/RenderBundle.h"
 #include "src/dawn/native/vulkan/BindGroupVk.h"
 #include "src/dawn/native/vulkan/BufferVk.h"
@@ -69,6 +70,7 @@
 #include "src/dawn/native/vulkan/VulkanError.h"
 #include "src/utils/compiler.h"
 #include "src/utils/numeric.h"
+#include "src/utils/span.h"
 
 namespace dawn::native::vulkan {
 
@@ -237,7 +239,7 @@ VkRect2D GetAlignedRenderArea(VkExtent2D granularity, BeginRenderPassCmd* render
 
 class DescriptorSetTracker : public BindGroupTrackerBase<true> {
   public:
-    bool AreLayoutsCompatible() override {
+    bool CanSkipDirtying() override {
         return mLastAppliedPipeline != nullptr &&
                mLastAppliedPipeline->GetLayout() == mPipeline->GetLayout() &&
                mLastAppliedImmediateSize == mImmediateSize;
@@ -337,7 +339,8 @@ class DescriptorSetTracker : public BindGroupTrackerBase<true> {
 
             const auto dynamicOffsetSpan = GetDynamicOffsets(dirtyBGIndex);
             uint32_t count = static_cast<uint32_t>(dynamicOffsetSpan.size());
-            const uint32_t* dynamicOffset = count > 0 ? dynamicOffsetSpan.data() : nullptr;
+            const uint32_t* dynamicOffset =
+                count > 0 ? CastIntSpan<const uint32_t>(dynamicOffsetSpan).data() : nullptr;
 
             vk.CmdBindDescriptorSets(commandBuffer, bindPoint, layout, setIndex, 1, &*set, count,
                                      dynamicOffset);
@@ -1539,6 +1542,16 @@ MaybeError CommandBuffer::RecordCommands(CommandRecordingContext* recordingConte
                 break;
             }
 
+            case Command::SetResourceUsage: {
+                SetResourceUsageCmd* cmd = mCommands.NextCommand<SetResourceUsageCmd>();
+                UsageBindingResource resource{
+                    .buffer = cmd->buffer.Get(),
+                    .texture = cmd->texture.Get(),
+                };
+                cmd->table->SetResourceUsage(&resource, cmd->usage);
+                break;
+            }
+
             default:
                 break;
         }
@@ -1615,9 +1628,10 @@ MaybeError CommandBuffer::RecordComputePass(CommandRecordingContext* recordingCo
             case Command::SetBindGroup: {
                 SetBindGroupCmd* cmd = mCommands.NextCommand<SetBindGroupCmd>();
                 BindGroup* bindGroup = ToBackend(cmd->group.Get());
-                ityp::span<BindingIndex, const uint32_t> dynamicOffsets;
-                if (cmd->dynamicOffsetCount != BindingIndex{0u}) {
-                    dynamicOffsets = mCommands.NextData<uint32_t>(cmd->dynamicOffsetCount);
+                ityp::span<DynamicOffsetsIndex, const BufferDynamicOffset> dynamicOffsets;
+                if (cmd->dynamicOffsetCount != DynamicOffsetsIndex{0u}) {
+                    dynamicOffsets =
+                        mCommands.NextData<BufferDynamicOffset>(cmd->dynamicOffsetCount);
                 }
 
                 state.descriptorSets.OnSetBindGroup(cmd->index, bindGroup, dynamicOffsets);
@@ -1702,6 +1716,16 @@ MaybeError CommandBuffer::RecordComputePass(CommandRecordingContext* recordingCo
             case Command::SetResourceTable: {
                 SetResourceTableCmd* cmd = mCommands.NextCommand<SetResourceTableCmd>();
                 state.descriptorSets.SetResourceTable(ToBackend(cmd->table.Get()));
+                break;
+            }
+
+            case Command::SetResourceUsage: {
+                SetResourceUsageCmd* cmd = mCommands.NextCommand<SetResourceUsageCmd>();
+                UsageBindingResource resource{
+                    .buffer = cmd->buffer.Get(),
+                    .texture = cmd->texture.Get(),
+                };
+                cmd->table->SetResourceUsage(&resource, cmd->usage);
                 break;
             }
 
@@ -1956,9 +1980,9 @@ MaybeError CommandBuffer::RecordRenderPass(CommandRecordingContext* recordingCon
             case Command::SetBindGroup: {
                 SetBindGroupCmd* cmd = iter->NextCommand<SetBindGroupCmd>();
                 BindGroup* bindGroup = ToBackend(cmd->group.Get());
-                ityp::span<BindingIndex, const uint32_t> dynamicOffsets;
-                if (cmd->dynamicOffsetCount != BindingIndex{0u}) {
-                    dynamicOffsets = iter->NextData<uint32_t>(cmd->dynamicOffsetCount);
+                ityp::span<DynamicOffsetsIndex, const BufferDynamicOffset> dynamicOffsets;
+                if (cmd->dynamicOffsetCount != DynamicOffsetsIndex{0u}) {
+                    dynamicOffsets = iter->NextData<BufferDynamicOffset>(cmd->dynamicOffsetCount);
                 }
 
                 state.descriptorSets.OnSetBindGroup(cmd->index, bindGroup, dynamicOffsets);

@@ -178,6 +178,17 @@ static constexpr ToggleEnumAndInfoList kToggleNameAndInfoList = {{
       "Suppresses validation errors on API entry points or parameter combinations that aren't "
       "considered secure yet.",
       "http://crbug.com/1138528", ToggleStage::Instance}},
+    {Toggle::AllowExperimentalAPIs,
+     {"allow_experimental_apis",
+      "Allows using experimental APIs (such as features, instance features, and chained structs) "
+      "whose C header definitions and ABI are not stable yet and may change across Dawn versions. "
+      "When disabled, only APIs with a stable C header and ABI are exposed.",
+      "https://crbug.com/577079442", ToggleStage::Instance}},
+    {Toggle::WebViewInstance,
+     {"webview_instance",
+      "Enabled on stable instances for Android WebView. Has no effect by default; used to "
+      "gate short-term workarounds or reverts for application regressions.",
+      "https://crbug.com/578760566", ToggleStage::Instance}},
     {Toggle::FlushBeforeClientWaitSync,
      {"flush_before_client_wait_sync",
       "Call glFlush before glClientWaitSync to work around bugs in the latter",
@@ -527,13 +538,6 @@ static constexpr ToggleEnumAndInfoList kToggleNameAndInfoList = {{
       "attachment's alpha channel unchanged, so the workaround is not observable to the "
       "application. Skipped for non-blendable formats.",
       "https://issues.chromium.org/issues/525294804", ToggleStage::Device}},
-    {Toggle::SplitBufferTextureCopyForOversizedRow,
-     {"split_buffer_texture_copy_for_oversized_row",
-      "Split a buffer-to-texture or texture-to-buffer copy into one copy command per row so its "
-      "row pitch (bytes) and row width (texels) never overflow hardware register fields or driver "
-      "stride calculations. Workaround for Intel, ARM, ImgTec, and Qualcomm GPU hardware/driver "
-      "limitations.",
-      "https://crbug.com/481934465", ToggleStage::Device}},
     {Toggle::GLUseArrayLengthFromImmediate,
      {"gl_use_array_length_from_immediate",
       "Use immediate data to replace arrayLength() function calls of dynamic storage buffers. "
@@ -993,6 +997,23 @@ static constexpr ToggleEnumAndInfoList kToggleNameAndInfoList = {{
      {"vulkan_use_descriptor_update_template",
       "Use VkDescriptorUpdateTemplate to update descriptor sets in BindGroup.",
       "https://crbug.com/438554018", ToggleStage::Device}},
+    {Toggle::D3D12DisableRelaxedBufferTextureCopyAlignmentForCompressedFormats,
+     {"d3d12_disable_relaxed_buffer_texture_copy_alignment_for_compressed_formats",
+      "Don't use the relaxed row pitch and offset alignment enabled by "
+      "d3d12_relax_buffer_texture_copy_pitch_and_offset_alignment in buffer-texture copies of "
+      "block-compressed textures. Works around a device hang on some Intel GPUs when many "
+      "buffer-texture copies of BC textures are recorded with unaligned buffer offsets.",
+      "https://crbug.com/581018327", ToggleStage::Device}},
+    {Toggle::GLLimitTextureImageUnitsTo13,
+     {"gl_limit_texture_image_units_to_13",
+      "Limit maxSampledTexturesPerShaderStage and maxSamplersPerShaderStage to 13, and reject "
+      "shaders using more than 13 GL texture image units. Works around a PowerVR driver bug.",
+      "https://crbug.com/580872855", ToggleStage::Adapter}},
+    {Toggle::ClearDepthWithDraw,
+     {"clear_depth_with_draw",
+      "Use Draw instead of backend clear to clear depth attachments. Works around flickering "
+      "bugs on D3D11.",
+      "https://crbug.com/568041933", ToggleStage::Device}},
 
     // Comment to separate the }} so it is clearer what to copy-paste to add a toggle.
 }};

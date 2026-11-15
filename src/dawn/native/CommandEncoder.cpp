@@ -39,7 +39,7 @@
 #include "src/dawn/common/Enumerator.h"
 #include "src/dawn/common/Math.h"
 #include "src/dawn/native/Adapter.h"
-#include "src/dawn/native/ApplyClearColorValueWithDrawHelper.h"
+#include "src/dawn/native/ApplyClearWithDrawHelper.h"
 #include "src/dawn/native/BindGroup.h"
 #include "src/dawn/native/BlitBufferToDepthStencil.h"
 #include "src/dawn/native/BlitBufferToTexture.h"
@@ -61,6 +61,7 @@
 #include "src/dawn/native/RenderPassEncoder.h"
 #include "src/dawn/native/RenderPassWorkaroundsHelper.h"
 #include "src/dawn/native/RenderPipeline.h"
+#include "src/dawn/native/ResourceTable.h"
 #include "src/dawn/native/ValidationUtils.h"
 #include "src/dawn/native/dawn_platform.h"
 #include "src/dawn/native/utils/NativeHelpers.h"
@@ -517,6 +518,10 @@ MaybeValError ValidateResolveTarget(const DeviceBase* device,
         !resolveTarget->GetFormat().SupportsResolveTarget(),
         "The resolve target %s format (%s) does not support being used as resolve target.",
         resolveTarget, resolveTargetFormat);
+    DAWN_INVALID_IF(!resolveTarget->GetTexture()->BackingMemorySupportsResolveTarget(),
+                    "The resolve target %s is backed by memory that does not support being used "
+                    "as resolve target.",
+                    resolveTarget);
 
     // TODO(450506641): Precompute allowed usages of texture views (including swizzle identity
     // check) instead of recomputing.
@@ -1374,6 +1379,7 @@ CommandBufferResourceUsage CommandEncoder::AcquireResourceUsages() {
         std::move(mTopLevelBuffers),
         std::move(mTopLevelTextures),
         std::move(mUsedQuerySets),
+        std::move(mTopLevelResourceTables),
     };
 }
 
@@ -1943,7 +1949,7 @@ void CommandEncoder::APICopyBufferToTexture(const TexelCopyBufferInfo* source,
 
                 return {};
             }
-            if (NeedsBufferTextureCopySplitForOversizedRow(GetDevice(), src, blockInfo)) {
+            if (NeedsBufferTextureCopySplitForOversizedRow(src, blockCopySize, blockInfo)) {
                 SplitCopyBufferToTextureForOversizedRow(allocator, src, dst, blockCopySize,
                                                         blockInfo);
                 return {};
@@ -2050,7 +2056,7 @@ void CommandEncoder::APICopyTextureToBuffer(const TexelCopyTextureInfo* sourceOr
             }
 
             // Workaround to split copies with oversized rows into per-row copies.
-            if (NeedsBufferTextureCopySplitForOversizedRow(GetDevice(), dst, blockInfo)) {
+            if (NeedsBufferTextureCopySplitForOversizedRow(dst, blockCopySize, blockInfo)) {
                 SplitCopyTextureToBufferForOversizedRow(allocator, dst, src, blockCopySize,
                                                         blockInfo);
                 return {};
@@ -2419,6 +2425,36 @@ void CommandEncoder::APIWriteTimestamp(QuerySetBase* querySet, uint32_t queryInd
             return {};
         },
         "encoding %s.WriteTimestamp(%s, %u).", this, querySet, queryIndex);
+}
+
+void CommandEncoder::APISetResourceUsage(ResourceTableBase* table,
+                                         const UsageBindingResource* resource,
+                                         wgpu::ResourceTableUsage usage) {
+    mEncodingContext.TryEncode(
+        this,
+        [&](CommandAllocator* allocator) -> MaybeValError {
+            if (GetDevice()->IsValidationEnabled()) {
+                DAWN_TRY(ValidateSetResourceUsage(GetDevice(), table, resource, usage));
+            }
+
+            SetResourceUsageCmd* cmd =
+                allocator->Allocate<SetResourceUsageCmd>(Command::SetResourceUsage);
+            cmd->table = table;
+            cmd->buffer = resource->buffer;
+            cmd->texture = resource->texture;
+            cmd->usage = usage;
+
+            mTopLevelResourceTables.insert(table);
+            if (resource->buffer != nullptr) {
+                mTopLevelBuffers.insert(resource->buffer);
+            }
+            if (resource->texture != nullptr) {
+                mTopLevelTextures.insert(resource->texture);
+            }
+
+            return {};
+        },
+        "encoding %s.SetResourceUsage(%s, %p, %s).", this, table, resource, usage);
 }
 
 CommandBufferBase* CommandEncoder::APIFinish(const CommandBufferDescriptor* descriptor) {

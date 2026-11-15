@@ -31,6 +31,7 @@
 
 #include "src/dawn/common/MatchVariant.h"
 #include "src/dawn/native/Device.h"
+#include "src/dawn/native/IntegerTypes.h"
 #include "src/dawn/native/TintUtils.h"
 #include "src/dawn/native/metal/BindGroupMTL.h"
 #include "src/dawn/native/metal/DeviceMTL.h"
@@ -57,15 +58,19 @@ BindGroupLayout::BindGroupLayout(DeviceBase* device,
     // Pool to free MTLArgumentDescriptor and NSArray.
     @autoreleasepool {
         std::vector<MTLArgumentDescriptor*> descriptors;
-        for (BindingIndex bindingIndex{0u}; bindingIndex < GetBindingCount(); ++bindingIndex) {
+        for (BindingIndex bindingIndex : Range(GetBindingCount())) {
             auto& bindingInfo = GetBindingInfo(bindingIndex);
+            if (bindingInfo.indexInArray != BindingIndex{0u}) {
+                // Skip binding_array elements after the first one.
+                continue;
+            }
 
             MTLArgumentDescriptor* desc = [MTLArgumentDescriptor argumentDescriptor];
             desc.index = ToMTLArgumentBufferIndex(bindingIndex);
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wdeprecated"
-            desc.access = MTLArgumentAccessReadOnly;
-#pragma clang diagnostic pop
+            desc.arrayLength = uint32_t{bindingInfo.arraySize};
+            // This appears to be the access mode for a slot of memory in the argbuf itself.
+            // We never modify the argbuf from the GPU, so it's ReadOnly.
+            desc.access = MTLBindingAccessReadOnly;
 
             // TODO(crbug.com/363031535): Handle more then uniform/storage.  (e.g. samplers,
             // textures, etc.)
@@ -125,19 +130,24 @@ MutexProtected<NSPRef<id<MTLArgumentEncoder>>>& BindGroupLayout::GetArgumentEnco
 
 void BindGroupLayout::FillTintArgumentBufferInfo(
     tint::msl::writer::ArgumentBufferInfo& info) const {
-    uint32_t curDynamicOffset = 0;
+    DynamicOffsetsIndex curDynamicOffsetsIndex;
 
-    for (BindingIndex bindingIndex : Range(GetBindingCount())) {
+    for (const BindingIndex bindingIndex : Range(GetBindingCount())) {
         const BindingInfo& bindingInfo = GetBindingInfo(bindingIndex);
+        if (bindingInfo.indexInArray > BindingIndex{0u}) {
+            // Skip binding_array elements after the first one.
+            continue;
+        }
 
         if (const auto* binding = std::get_if<BufferBindingInfo>(&bindingInfo.bindingLayout)) {
             if (binding->hasDynamicOffset) {
                 info.binding_info_to_offset_index.insert(
-                    {uint32_t(bindingIndex), curDynamicOffset++});
+                    {uint32_t{bindingIndex}, uint32_t{curDynamicOffsetsIndex++}});
             }
         }
         info.struct_members.push_back({
-            .id = uint32_t(bindingIndex),
+            .id = uint32_t{bindingIndex},
+            .array_size = uint32_t{bindingInfo.arraySize},
             .placeholder_type = dawn::native::BindingLayoutToResourceType(GetDevice(), bindingInfo),
         });
     }

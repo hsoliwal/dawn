@@ -408,6 +408,7 @@ if (DAWN_ENABLE_OPENGLES)
         "white_box/GLBufferTests.cpp"
         "white_box/GLDeferredWorkTests.cpp"
         "white_box/GLFramebufferCompletenessTests.cpp"
+        "white_box/GLGraphicsResetTests.cpp"
         "white_box/GLTextureWrappingTests.cpp"
         "white_box/GLUncheckedErrorTests.cpp"
     )
@@ -669,6 +670,7 @@ set(unittest_sources
     "unittests/validation/ResourceUsageTrackingTests.cpp"
     "unittests/validation/SamplerValidationTests.cpp"
     "unittests/validation/ShaderModuleValidationTests.cpp"
+    "unittests/validation/StableInstanceValidationTests.cpp"
     "unittests/validation/StorageTextureValidationTests.cpp"
     "unittests/validation/TexelBufferValidationTests.cpp"
     "unittests/validation/TextureSubresourceTests.cpp"

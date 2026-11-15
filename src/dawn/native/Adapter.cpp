@@ -104,6 +104,11 @@ void AdapterBase::UpdateLimits() {
     if (mUseTieredLimits) {
         ApplyLimitTiers(&mLimits);
     }
+
+    // Applied after tiering as the clamped limits are below the lowest tier.
+    if (mTogglesState.IsEnabled(Toggle::GLLimitTextureImageUnitsTo13)) {
+        LimitGLTextureImageUnits(&mLimits);
+    }
 }
 
 const CombinedLimits& AdapterBase::GetLimits() const {
@@ -111,7 +116,9 @@ const CombinedLimits& AdapterBase::GetLimits() const {
 }
 
 wgpu::Status AdapterBase::APIGetLimits(Limits* limits) const {
-    if (mInstance->ConsumedError(FillLimits(limits, mSupportedFeatures, mLimits))) {
+    if (mInstance->ConsumedError(
+            ValidateAndFillLimits(limits, mSupportedFeatures, mLimits,
+                                  mTogglesState.IsEnabled(Toggle::AllowExperimentalAPIs)))) {
         return wgpu::Status::Error;
     }
     return wgpu::Status::Success;
@@ -161,6 +168,11 @@ wgpu::Status AdapterBase::APIGetInfo(AdapterInfo* info) const {
 ResultOrValError<UnpackedPtr<AdapterInfo>> AdapterBase::ValidateGetInfo(AdapterInfo* info) const {
     UnpackedPtr<AdapterInfo> unpacked;
     DAWN_TRY_ASSIGN(unpacked, ValidateAndUnpack(info));
+    if (!mTogglesState.IsEnabled(Toggle::AllowExperimentalAPIs)) {
+        // Only the chained structs that are part of the stable ABI may be requested.
+        DAWN_TRY_CONTEXT(unpacked.ValidateStable(),
+                         "validating AdapterInfo chain with allow_experimental_apis disabled");
+    }
 
     DAWN_INVALID_IF(
         unpacked.Has<AdapterPropertiesMemoryHeaps>() &&
@@ -272,6 +284,12 @@ ResultOrUnknownError<Ref<DeviceBase>> AdapterBase::CreateDeviceInternal(
     // state.
     UnpackedPtr<DeviceDescriptor> descriptor;
     DAWN_TRY_ASSIGN(descriptor, ValidateAndUnpack(rawDescriptor));
+    if (!mTogglesState.IsEnabled(Toggle::AllowExperimentalAPIs)) {
+        // Only the chained structs that are part of the stable ABI may be used. This also rejects
+        // DawnTogglesDescriptor, so allow_experimental_apis cannot be turned back on here.
+        DAWN_TRY_CONTEXT(descriptor.ValidateStable(),
+                         "validating %s with allow_experimental_apis disabled", rawDescriptor);
+    }
     auto* deviceTogglesDesc = descriptor.Get<DawnTogglesDescriptor>();
 
     // Create device toggles state.
@@ -295,8 +313,9 @@ ResultOrUnknownError<Ref<DeviceBase>> AdapterBase::CreateDeviceInternal(
 
     if (descriptor->requiredLimits != nullptr) {
         CombinedLimits requiredLimits;
-        DAWN_TRY_CONTEXT(ValidateAndUnpackLimitsIn(descriptor->requiredLimits, requiredFeatureSet,
-                                                   &requiredLimits),
+        DAWN_TRY_CONTEXT(ValidateAndUnpackLimitsIn(
+                             descriptor->requiredLimits, requiredFeatureSet, &requiredLimits,
+                             deviceToggles.IsEnabled(Toggle::AllowExperimentalAPIs)),
                          "Validating and unpacking descriptor->requiredLimits");
 
         DAWN_TRY_CONTEXT(ValidateLimits(GetLimits(), requiredLimits), "validating required limits");

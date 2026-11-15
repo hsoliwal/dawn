@@ -31,6 +31,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -79,6 +80,8 @@ type flags struct {
 	caseTimeout          time.Duration
 	startupAllowance     time.Duration
 	recover              bool
+	shardIndex           int
+	shardCount           int
 	dawn                 node.Flags
 }
 
@@ -100,6 +103,7 @@ type cmd struct {
 	coverage   *common.Coverage
 	queries    []string
 	adbPath    string
+	ctsZip     bool // -cts names a CTS zip rather than a directory
 }
 
 func (c *cmd) Name() string {
@@ -143,6 +147,8 @@ func (c *cmd) RegisterFlags(ctx context.Context, cfg common.Config) ([]string, e
 		flag.BoolVar(&c.flags.isolated, "isolate", false, "run each test in an isolated process")
 	}
 	flag.BoolVar(&c.flags.build, "build", true, "attempt to build the CTS before running")
+	flag.IntVar(&c.flags.shardIndex, "shard-index", 0, "with -shard-count, the shard of the test cases to run, from 0 to -shard-count - 1")
+	flag.IntVar(&c.flags.shardCount, "shard-count", 1, "number of shards to split the test cases into, so that several machines can each run different shards")
 	flag.BoolVar(&c.flags.validate, "validate", false, "enable backend validation")
 	flag.Var(&c.flags.dawn, "flag", "flag to pass to dawn-node as flag=value. multiple flags must be passed in individually")
 	flag.StringVar(&c.flags.backend, "backend", backendDefault, "backend to use: default|null|webgpu|d3d11|d3d12|metal|vulkan|opengl|opengles."+
@@ -194,7 +200,7 @@ func (c *cmd) Run(ctx context.Context, cfg common.Config) error {
 
 	target, _ := c.target()
 	if adb, ok := target.(*adbTarget); ok && c.flags.stage != stageNever {
-		if err := adb.stage(c.flags.runner, c.flags.CTS, c.flags.stage == stageAlways); err != nil {
+		if err := adb.stage(c.flags.runner, c.flags.CTS, c.ctsZip, c.flags.stage == stageAlways); err != nil {
 			return fmt.Errorf("failed to stage onto the device: %w", err)
 		}
 		if c.flags.stageOnly {
@@ -205,6 +211,11 @@ func (c *cmd) Run(ctx context.Context, cfg common.Config) error {
 	testCases, err := c.queryTestCases()
 	if err != nil {
 		return err
+	}
+	if c.flags.shardCount > 1 {
+		all := len(testCases)
+		testCases = shardCases(testCases, c.flags.shardIndex, c.flags.shardCount)
+		fmt.Printf("Shard %d of %d: %d of %d test cases\n", c.flags.shardIndex, c.flags.shardCount, len(testCases), all)
 	}
 	fmt.Printf("Testing %d test cases...\n", len(testCases))
 
@@ -247,8 +258,9 @@ func (c *cmd) Run(ctx context.Context, cfg common.Config) error {
 	return nil
 }
 
-// target returns where to run the command-line runner, and the CTS directory there.
-func (c *cmd) target() (target, string) {
+// target returns where to run the command-line runner, and the standalone
+// runner's arguments that locate the CTS there.
+func (c *cmd) target() (target, []string) {
 	if c.flags.adb {
 		t := &adbTarget{
 			adb:       c.adbPath,
@@ -256,20 +268,25 @@ func (c *cmd) target() (target, string) {
 			deviceDir: c.flags.deviceDir,
 			verbose:   c.flags.Verbose,
 		}
-		return t, t.devicePath(deviceCTS)
+		return t, []string{"--cts-zip", t.devicePath(deviceCTS)}
 	}
 	runner := c.flags.Node
 	if c.standalone {
 		runner = c.flags.runner
 	}
+	dir, ctsArgs := c.flags.CTS, []string{"--cts-dir", c.flags.CTS}
+	if c.ctsZip {
+		// A zip cannot be the working directory, so run in the current one.
+		dir, ctsArgs = "", []string{"--cts-zip", c.flags.CTS}
+	}
 	return &localTarget{
 		runner:  runner,
-		dir:     c.flags.CTS,
+		dir:     dir,
 		verbose: c.flags.Verbose,
 		// The VS Code launch.json output does not work for the standalone runner,
 		// which reads its test cases from stdin.
 		skipVSCodeInfo: c.flags.skipVSCodeInfo || c.standalone,
-	}, c.flags.CTS
+	}, ctsArgs
 }
 
 func (c *cmd) processFlags(fsReaderWriter oswrapper.FilesystemReaderWriter) error {
@@ -350,6 +367,12 @@ func (c *cmd) processFlags(fsReaderWriter oswrapper.FilesystemReaderWriter) erro
 	} else if c.flags.stageOnly {
 		return fmt.Errorf("-stage-only needs -adb")
 	}
+	if c.flags.shardCount < 1 {
+		return fmt.Errorf("-shard-count must be at least 1")
+	}
+	if c.flags.shardIndex < 0 || c.flags.shardIndex >= c.flags.shardCount {
+		return fmt.Errorf("-shard-index must be from 0 to %d, not %d", c.flags.shardCount-1, c.flags.shardIndex)
+	}
 	if c.flags.NumRunners < 1 {
 		c.flags.NumRunners = 1
 	}
@@ -383,6 +406,20 @@ func (c *cmd) processFlags(fsReaderWriter oswrapper.FilesystemReaderWriter) erro
 	}
 	c.state = *state
 
+	// A CTS zip is already built, and only the standalone runner reads one.
+	c.ctsZip = !fileutils.IsDir(c.flags.CTS, fsReaderWriter)
+	if c.ctsZip {
+		if !c.standalone {
+			return fmt.Errorf("'%v' is not a directory; only run-cts standalone can run a CTS zip", c.flags.CTS)
+		}
+		c.flags.build = false
+	}
+
+	// Standalone runs need node only to build the CTS with npx.
+	if c.flags.Node == "" && (!c.standalone || c.flags.build) {
+		return common.ErrNodeNotFound
+	}
+
 	return nil
 }
 
@@ -402,7 +439,13 @@ func (c *cmd) queryTestCases() ([]common.TestCase, error) {
 	testCases := []common.TestCase{}
 	queryOf := map[common.TestCase]string{}
 	for _, query := range c.queries {
-		cases, err := c.state.CTS.QueryTestCases(c.flags.Verbose, query)
+		var cases []common.TestCase
+		var err error
+		if c.standalone {
+			cases, err = c.listTestCases(query)
+		} else {
+			cases, err = c.state.CTS.QueryTestCases(c.flags.Verbose, query)
+		}
 		if err != nil {
 			return nil, fmt.Errorf("failed to gather tests: %w", err)
 		}
@@ -413,6 +456,29 @@ func (c *cmd) queryTestCases() ([]common.TestCase, error) {
 			queryOf[testCase] = query
 		}
 		testCases = append(testCases, cases...)
+	}
+	return testCases, nil
+}
+
+// listTestCases returns the test cases that match query, as listed by the
+// standalone runner on the target.
+func (c *cmd) listTestCases(query string) ([]common.TestCase, error) {
+	target, ctsArgs := c.target()
+	proc, err := target.start(append(c.runnerArgs(ctsArgs), "--list", "-q", query), "")
+	if err != nil {
+		return nil, err
+	}
+	output, err := io.ReadAll(proc.output())
+	exit := proc.wait()
+	if err != nil {
+		return nil, err
+	}
+	if !exit.success {
+		return nil, fmt.Errorf("the runner could not list '%v' (%v):\n%s", query, exit.description, output)
+	}
+	testCases := []common.TestCase{}
+	for _, line := range nonEmptyLines(string(output)) {
+		testCases = append(testCases, common.TestCase(line))
 	}
 	return testCases, nil
 }

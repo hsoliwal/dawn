@@ -30,6 +30,7 @@
 #include "src/dawn/native/Adapter.h"
 #include "src/dawn/native/CreatePipelineAsyncEvent.h"
 #include "src/dawn/native/Instance.h"
+#include "src/dawn/native/Toggles.h"
 #include "src/dawn/native/metal/BackendMTL.h"
 #include "src/dawn/native/metal/DeviceMTL.h"
 #include "src/dawn/native/metal/ImmediatesLayoutMTL.h"
@@ -348,24 +349,15 @@ MaybeUnknownError RenderPipeline::InitializeImpl() {
     mMtlPrimitiveTopology = MTLPrimitiveTopology(GetPrimitiveTopology());
     mMtlFrontFace = MTLFrontFace(GetFrontFace());
     mMtlCullMode = ToMTLCullMode(GetCullMode());
-    // Build a mapping of vertex buffer slots to packed indices
-    {
-        PipelineLayout* layout = ToBackend(GetLayout());
 
-        // Vertex buffers are placed after all the buffers for the bind groups.
-        uint32_t mtlVertexBufferIndex = layout->GetBufferBindingCount(SingleShaderStage::Vertex);
-
-        for (VertexBufferSlot slot : GetVertexBuffersUsed()) {
-            if (GetDevice()->HasFeature(Feature::ChromiumExperimentalSamplingResourceTable) &&
-                !GetDevice()->IsToggleEnabled(Toggle::MetalUseArgumentBuffers) &&
-                (mtlVertexBufferIndex >= kResourceTableStorageSlot ||
-                 mtlVertexBufferIndex >= kResourceTableBindingSlot)) {
-                return DAWN_UNRECOVERABLE_ERROR(
-                    "Vertex buffer slot %d overlaps with required ResourceTable slot",
-                    mtlVertexBufferIndex);
-            }
-            mMtlVertexBufferIndices[slot] = mtlVertexBufferIndex;
-            mtlVertexBufferIndex++;
+    if (GetDevice()->HasFeature(Feature::ChromiumExperimentalSamplingResourceTable) &&
+        !GetDevice()->IsToggleEnabled(Toggle::MetalUseArgumentBuffers)) {
+        PerStageBufferIndex bufferBindingCount =
+            ToBackend(GetLayout())->GetBufferBindingCount(SingleShaderStage::Vertex);
+        if (bufferBindingCount > kMaxVertexStageBufferCountWithResourceTableWithoutArgBufs) {
+            return DAWN_UNRECOVERABLE_ERROR(
+                "Vertex stage slot [[buffer(%d)]] overlaps with a required ResourceTable slot",
+                uint32_t{bufferBindingCount} - 1);
         }
     }
 
@@ -522,11 +514,6 @@ id<MTLDepthStencilState> RenderPipeline::GetMTLDepthStencilState() {
     return mMtlDepthStencilState.Get();
 }
 
-uint32_t RenderPipeline::GetMtlVertexBufferIndex(VertexBufferSlot slot) const {
-    DAWN_ASSERT(slot < kMaxVertexBuffersTyped);
-    return mMtlVertexBufferIndices[slot];
-}
-
 NSRef<MTLVertexDescriptor> RenderPipeline::MakeVertexDesc() const {
     MTLVertexDescriptor* mtlVertexDescriptor = [MTLVertexDescriptor new];
 
@@ -560,7 +547,8 @@ NSRef<MTLVertexDescriptor> RenderPipeline::MakeVertexDesc() const {
             layoutDesc.stride = info.arrayStride;
         }
 
-        mtlVertexDescriptor.layouts[GetMtlVertexBufferIndex(slot)] = layoutDesc;
+        mtlVertexDescriptor.layouts[uint32_t{VertexBufferSlotToMetalBufferIndex(slot)}] =
+            layoutDesc;
         [layoutDesc release];
     }
 
@@ -570,7 +558,8 @@ NSRef<MTLVertexDescriptor> RenderPipeline::MakeVertexDesc() const {
         auto attribDesc = [MTLVertexAttributeDescriptor new];
         attribDesc.format = VertexFormatType(info.format);
         attribDesc.offset = info.offset;
-        attribDesc.bufferIndex = GetMtlVertexBufferIndex(info.vertexBufferSlot);
+        attribDesc.bufferIndex =
+            uint32_t{VertexBufferSlotToMetalBufferIndex(info.vertexBufferSlot)};
         mtlVertexDescriptor.attributes[static_cast<uint8_t>(loc)] = attribDesc;
         [attribDesc release];
     }

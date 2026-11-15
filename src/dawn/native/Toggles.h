@@ -68,6 +68,8 @@ enum class Toggle {
     DisableRobustness,
     MetalEnableVertexPulling,
     AllowUnsafeAPIs,
+    AllowExperimentalAPIs,
+    WebViewInstance,
     FlushBeforeClientWaitSync,
     UseTempBufferInSmallFormatTextureToTextureCopyFromGreaterToLessMipLevel,
     EmitHLSLDebugSymbols,
@@ -131,7 +133,6 @@ enum class Toggle {
     UseBlitForSintTextureToBufferCopy,
     VulkanSplitBufferTextureCopyForArrayLayers,
     VulkanForceAlphaWriteForAlphaToCoverage,
-    SplitBufferTextureCopyForOversizedRow,
     GLUseArrayLengthFromImmediate,
     D3D11DisableCPUUploadBuffers,
     UseT2B2TForSRGBTextureCopy,
@@ -237,6 +238,9 @@ enum class Toggle {
     Limit3DTexturePotFootprintTo4GB,
     LimitMaxTextureBytesTo1MB,
     VulkanUseDescriptorUpdateTemplate,
+    D3D12DisableRelaxedBufferTextureCopyAlignmentForCompressedFormats,
+    GLLimitTextureImageUnitsTo13,
+    ClearDepthWithDraw,
 
     EnumCount,
     InvalidEnum = EnumCount,
@@ -293,7 +297,7 @@ class TogglesState {
     // inherited to all later stage as forced.
     void ForceSet(Toggle toggle, bool enabled);
 
-    // Set a toggle of any stage for testing propose. Return *this to allow method chaining
+    // Set a toggle of any stage for testing purpose. Return *this to allow method chaining
     // manner.
     TogglesState& SetForTesting(Toggle toggle, bool enabled, bool forced);
 

@@ -1821,6 +1821,7 @@ bool Converter::Convert(interop::GPUFeatureName& out, wgpu::FeatureName in) {
         case wgpu::FeatureName::SharedTextureMemoryD3D11Texture2D:
         case wgpu::FeatureName::SharedTextureMemoryDmaBuf:
         case wgpu::FeatureName::SharedTextureMemoryDXGISharedHandle:
+        case wgpu::FeatureName::SharedTextureMemoryDXGIY410:
         case wgpu::FeatureName::SharedTextureMemoryEGLImage:
         case wgpu::FeatureName::SharedTextureMemoryIOSurface:
         case wgpu::FeatureName::SharedTextureMemoryOpaqueFD:
@@ -1903,6 +1904,9 @@ bool Converter::Convert(wgpu::WGSLLanguageFeatureName& out, interop::WGSLLanguag
         case interop::WGSLLanguageFeatureName::kMultisampledArrayTextures:
             out = wgpu::WGSLLanguageFeatureName::MultisampledArrayTextures;
             return true;
+        case interop::WGSLLanguageFeatureName::kUnrestrictedAliasing:
+            out = wgpu::WGSLLanguageFeatureName::UnrestrictedAliasing;
+            return true;
     }
     return false;
 }
@@ -1962,6 +1966,9 @@ bool Converter::Convert(interop::WGSLLanguageFeatureName& out, wgpu::WGSLLanguag
             return true;
         case wgpu::WGSLLanguageFeatureName::MultisampledArrayTextures:
             out = interop::WGSLLanguageFeatureName::kMultisampledArrayTextures;
+            return true;
+        case wgpu::WGSLLanguageFeatureName::UnrestrictedAliasing:
+            out = interop::WGSLLanguageFeatureName::kUnrestrictedAliasing;
             return true;
 
         case wgpu::WGSLLanguageFeatureName::ChromiumTestingUnimplemented:

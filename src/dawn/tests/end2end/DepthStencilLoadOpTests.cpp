@@ -206,9 +206,10 @@ class DepthStencilLoadOpTests : public DawnTestWithParams<DepthStencilLoadOpTest
 TEST_P(DepthStencilLoadOpTests, ClearMip0) {
     // TODO(crbug.com/519296892): Produces incorrect result on Pixel 10.
     DAWN_SUPPRESS_TEST_IF(IsAndroid() && IsImgTec() && IsVulkan());
-
     // TODO(crbug.com/dawn/1828): depth16unorm broken on Apple GPUs.
     DAWN_SUPPRESS_TEST_IF(IsApple() && GetParam().mFormat == wgpu::TextureFormat::Depth16Unorm);
+    // TODO(crbug.com/477645284): Fails on Mac Intel with Metal Shader Validation.
+    DAWN_SUPPRESS_TEST_IF(IsMetal() && IsIntel() && IsFullBackendValidationEnabled());
 
     wgpu::CommandEncoder encoder = device.CreateCommandEncoder();
     encoder.BeginRenderPass(&renderPassDescriptors[0]).End();
@@ -222,6 +223,8 @@ TEST_P(DepthStencilLoadOpTests, ClearMip0) {
 TEST_P(DepthStencilLoadOpTests, ClearMip1) {
     // TODO(crbug.com/519296892): Produces incorrect result on Pixel 10.
     DAWN_SUPPRESS_TEST_IF(IsAndroid() && IsImgTec() && IsVulkan());
+    // TODO(crbug.com/477645284): Fails on Mac Intel with Metal Shader Validation.
+    DAWN_SUPPRESS_TEST_IF(IsMetal() && IsIntel() && IsFullBackendValidationEnabled());
 
     wgpu::CommandEncoder encoder = device.CreateCommandEncoder();
     encoder.BeginRenderPass(&renderPassDescriptors[1]).End();
@@ -235,9 +238,10 @@ TEST_P(DepthStencilLoadOpTests, ClearMip1) {
 TEST_P(DepthStencilLoadOpTests, ClearBothMip0Then1) {
     // TODO(crbug.com/519296892): Produces incorrect result on Pixel 10.
     DAWN_SUPPRESS_TEST_IF(IsAndroid() && IsImgTec() && IsVulkan());
-
     // TODO(crbug.com/dawn/1828): depth16unorm broken on Apple GPUs.
     DAWN_SUPPRESS_TEST_IF(IsApple() && GetParam().mFormat == wgpu::TextureFormat::Depth16Unorm);
+    // TODO(crbug.com/477645284): Fails on Mac Intel with Metal Shader Validation.
+    DAWN_SUPPRESS_TEST_IF(IsMetal() && IsIntel() && IsFullBackendValidationEnabled());
 
     wgpu::CommandEncoder encoder = device.CreateCommandEncoder();
     encoder.BeginRenderPass(&renderPassDescriptors[0]).End();
@@ -253,10 +257,10 @@ TEST_P(DepthStencilLoadOpTests, ClearBothMip0Then1) {
 TEST_P(DepthStencilLoadOpTests, ClearBothMip1Then0) {
     // TODO(crbug.com/519296892): Produces incorrect result on Pixel 10.
     DAWN_SUPPRESS_TEST_IF(IsAndroid() && IsImgTec() && IsVulkan());
-
     // TODO(crbug.com/dawn/1828): depth16unorm broken on Apple GPUs.
     DAWN_SUPPRESS_TEST_IF(IsApple() && GetParam().mFormat == wgpu::TextureFormat::Depth16Unorm);
-
+    // TODO(crbug.com/477645284): Fails on Mac Intel with Metal Shader Validation.
+    DAWN_SUPPRESS_TEST_IF(IsMetal() && IsIntel() && IsFullBackendValidationEnabled());
     // TODO(42242119): fail on Qualcomm Adreno X1.
     DAWN_SUPPRESS_TEST_IF(IsD3D11() && IsQualcomm() &&
                           GetDriverVersion() < gpu_info::DriverVersion({31, 0, 170, 0}));
@@ -273,14 +277,16 @@ TEST_P(DepthStencilLoadOpTests, ClearBothMip1Then0) {
 
 auto GenerateParam() {
     auto params1 = MakeParamGenerator<DepthStencilLoadOpTestParams>(
-        {D3D11Backend(), D3D12Backend(), D3D12Backend({}, {"use_d3d12_render_pass"}),
-         MetalBackend(), OpenGLBackend(), OpenGLESBackend(), VulkanBackend(), WebGPUBackend()},
+        {D3D11Backend(), D3D11Backend({"clear_depth_with_draw"}), D3D12Backend(),
+         D3D12Backend({}, {"use_d3d12_render_pass"}), MetalBackend(), OpenGLBackend(),
+         OpenGLESBackend(), VulkanBackend(), WebGPUBackend()},
         {wgpu::TextureFormat::Depth32Float, wgpu::TextureFormat::Depth16Unorm},
         {Check::CopyDepth, Check::DepthTest, Check::SampleDepth});
 
     auto params2 = MakeParamGenerator<DepthStencilLoadOpTestParams>(
-        {D3D11Backend(), D3D12Backend(), D3D12Backend({}, {"use_d3d12_render_pass"}),
-         MetalBackend(), MetalBackend({"metal_use_combined_depth_stencil_format_for_stencil8"}),
+        {D3D11Backend(), D3D11Backend({"clear_depth_with_draw"}), D3D12Backend(),
+         D3D12Backend({}, {"use_d3d12_render_pass"}), MetalBackend(),
+         MetalBackend({"metal_use_combined_depth_stencil_format_for_stencil8"}),
          MetalBackend(
              {"metal_use_both_depth_and_stencil_attachments_for_combined_depth_stencil_formats"}),
          OpenGLBackend(), OpenGLESBackend(), VulkanBackend(), WebGPUBackend()},
@@ -475,7 +481,8 @@ TEST_P(DepthTextureClearTwiceTest, ClearDepthAspectTwice) {
 
 DAWN_INSTANTIATE_TEST_P(
     DepthTextureClearTwiceTest,
-    {D3D11Backend(), D3D11Backend({"use_packed_depth24_unorm_stencil8_format"}), D3D12Backend(),
+    {D3D11Backend(), D3D11Backend({"clear_depth_with_draw"}),
+     D3D11Backend({"use_packed_depth24_unorm_stencil8_format"}), D3D12Backend(),
      D3D12Backend({"use_packed_depth24_unorm_stencil8_format"}), MetalBackend(), OpenGLBackend(),
      OpenGLESBackend(), VulkanBackend({"vulkan_use_dynamic_rendering"}, {}),
      VulkanBackend({"vulkan_use_create_render_pass_2"}, {"vulkan_use_dynamic_rendering"}),
