@@ -481,43 +481,6 @@ def as_ktName(name):
     return '_' + name if '0' <= name[0] <= '9' else name
 
 
-def as_jsEnumValue(value):
-    if 'jsrepr' in value.json_data: return value.json_data['jsrepr']
-    return "'" + value.name.js_enum_case() + "'"
-
-
-def has_wasmType(return_type, args):
-    return all(map(lambda x: len(as_wasmType(x)) == 1, [return_type] + args))
-
-
-# Returns a single character wasm type (v/p/i/j/f/d) if valid, a "(longer string)" if not
-def as_wasmType(x):
-    if x is None:
-        return 'v'  # void return type
-
-    if isinstance(x, AnnotatedTypedMember):
-        if x.annotation == 'value':
-            x = x.type
-        elif '*' in x.annotation:
-            return 'p'
-        else:
-            x = x.type
-
-    if isinstance(x, Type):
-        if x.category == 'enum':
-            return 'i'
-        elif x.category == 'bitmask':
-            return 'j'
-        elif x.category in ['object', 'function pointer']:
-            return 'p'
-        elif x.category == 'native':
-            return x.json_data.get('wasm type', f'({x.name.name})')
-        elif x.category in ['structure', 'callback info']:
-            return f'({x.name.name})'  # Invalid
-        else:
-            assert False, 'Type -> ' + x.category
-
-
 def convert_cType_to_cppType(typ, annotation, arg, indent=0):
     if typ.category == 'native':
         return arg
@@ -748,9 +711,6 @@ def make_base_render_params(metadata, has_stability_info=False):
             'as_cProc': as_cProc,
             'as_cType': lambda name, spanify=False: as_cType(c_prefix, name, spanify),
             'as_cppType': as_cppType,
-            'as_jsEnumValue': as_jsEnumValue,
-            'has_wasmType': has_wasmType,
-            'as_wasmType': as_wasmType,
             'convert_cType_to_cppType': convert_cType_to_cppType,
             'as_varName': as_varName,
             'decorate': lambda typ, arg: decorate(typ, arg, with_nullability=False),
@@ -852,7 +812,7 @@ class MultiGeneratorFromDawnJSON(Generator):
 
         params_all = parse_json(
             loaded_json,
-            enabled_tags=['dawn', 'emscripten', 'native', 'deprecated'],
+            enabled_tags=['dawn', 'native', 'deprecated'],
             addins=extra_addins)
 
         metadata = params_dawn['metadata']

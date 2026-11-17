@@ -28,12 +28,6 @@
 //*
 {% include 'BSD_LICENSE' %}
 
-{%- if 'dawn' in enabled_tags %}
-    #ifdef __EMSCRIPTEN__
-    #error "Do not include this header. Use the headers provided by Emdawnwebgpu instead."
-    #endif
-{% endif %}
-
 #ifndef {{metadata.api.upper()}}_H_
 #define {{metadata.api.upper()}}_H_
 
@@ -341,11 +335,6 @@ extern "C" {
 #endif
 
 #if !defined({{API}}_SKIP_PROCS)
-{% if 'emscripten' in enabled_tags %}
-    // TODO(374150686): Remove these Emscripten specific declarations from the
-    // header once they are fully deprecated.
-    {{API}}_EXPORT WGPUDevice emscripten_webgpu_get_device(void);
-{% endif %}
 // Global procs
 {% for function in by_category["function"] %}
     typedef {{as_nullability_annotated_cType(function.returns)}} (*{{as_cProc(None, function.name)}})(

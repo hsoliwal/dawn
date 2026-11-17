@@ -125,9 +125,7 @@ wgpu::PipelineLayout MakePipelineLayout(const wgpu::Device& device,
 
 extern wgpu::ExternalTextureBindingLayout kExternalTextureBindingLayout;
 
-#if !DAWN_PLATFORM_IS(EMSCRIPTEN)
 extern wgpu::TexelBufferBindingLayout kTexelBufferBindingLayout;
-#endif  // !DAWN_PLATFORM_IS(EMSCRIPTEN)
 
 // Helpers to make creating bind group layouts look nicer:
 //
@@ -161,11 +159,9 @@ struct BindingLayoutEntryInitializationHelper : wgpu::BindGroupLayoutEntry {
     BindingLayoutEntryInitializationHelper(uint32_t entryBinding,
                                            wgpu::ShaderStage entryVisibility,
                                            wgpu::ExternalTextureBindingLayout* bindingLayout);
-#if !DAWN_PLATFORM_IS(EMSCRIPTEN)
     BindingLayoutEntryInitializationHelper(uint32_t entryBinding,
                                            wgpu::ShaderStage entryVisibility,
                                            wgpu::TexelBufferBindingLayout* bindingLayout);
-#endif  // !DAWN_PLATFORM_IS(EMSCRIPTEN)
     explicit(false) BindingLayoutEntryInitializationHelper(const wgpu::BindGroupLayoutEntry& entry);
 };
 
@@ -187,9 +183,7 @@ struct BindingInitializationHelper {
     BindingInitializationHelper(uint32_t binding, const wgpu::Sampler& sampler);
     BindingInitializationHelper(uint32_t binding, const wgpu::TextureView& textureView);
     BindingInitializationHelper(uint32_t binding, const wgpu::ExternalTexture& externalTexture);
-#if !DAWN_PLATFORM_IS(EMSCRIPTEN)
     BindingInitializationHelper(uint32_t binding, const wgpu::TexelBufferView& texelBufferView);
-#endif  // !DAWN_PLATFORM_IS(EMSCRIPTEN)
     BindingInitializationHelper(uint32_t binding,
                                 const wgpu::Buffer& buffer,
                                 uint64_t offset = 0,
@@ -204,9 +198,7 @@ struct BindingInitializationHelper {
     wgpu::TextureView textureView;
     wgpu::Buffer buffer;
     mutable wgpu::ExternalTextureBindingEntry externalTextureBindingEntry;
-#if !DAWN_PLATFORM_IS(EMSCRIPTEN)
     mutable wgpu::TexelBufferBindingEntry texelBufferBindingEntry = {};
-#endif  // !DAWN_PLATFORM_IS(EMSCRIPTEN)
     uint64_t offset = 0;
     uint64_t size = 0;
 };
@@ -216,13 +208,11 @@ wgpu::BindGroup MakeBindGroup(
     const wgpu::BindGroupLayout& layout,
     std::initializer_list<BindingInitializationHelper> entriesInitializer);
 
-#if !DAWN_PLATFORM_IS(EMSCRIPTEN)
 // Make an external texture from one or two planes that doesn't perform any color-space conversion
 // or YUV to RGB conversion. The planes are given as textures so that we can reflect their size.
 wgpu::ExternalTexture MakePassthroughExternalTexture(const wgpu::Device& device,
                                                      const wgpu::Texture& plane0,
                                                      const wgpu::Texture& plane1 = {});
-#endif  // !DAWN_PLATFORM_IS(EMSCRIPTEN)
 
 bool BackendRequiresCompat(wgpu::BackendType backend);
 
@@ -232,10 +222,8 @@ int8_t ConvertFloatToSnorm8(float value);
 int16_t ConvertFloatToSnorm16(float value);
 uint16_t ConvertFloatToUnorm16(float value);
 
-#if !DAWN_PLATFORM_IS(EMSCRIPTEN)
 wgpu::SharedFence ImportFenceTo(const wgpu::Device& importingDevice,
                                 const wgpu::SharedFence& fence);
-#endif  // !DAWN_PLATFORM_IS(EMSCRIPTEN)
 
 }  // namespace dawn::utils
 

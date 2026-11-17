@@ -5,9 +5,6 @@ gclient_gn_args_file = 'build/config/gclient_args.gni'
 gclient_gn_args = [
   'android_ndk_version',
   'build_with_chromium',
-  'checkout_v8',
-  'dawn_node',
-  'dawn_wasm',
   'generate_location_tags',
 ]
 
@@ -21,8 +18,6 @@ vars = {
   'swiftshader_git': 'https://swiftshader.googlesource.com',
 
   'dawn_standalone': True,
-  'dawn_node': False, # Also fetches dependencies required for building NodeJS bindings.
-  'dawn_wasm': False, # Also fetches dependencies required for building WebAssembly.
   'dawn_cmake_version': 'version:2@3.23.3',
   'dawn_cmake_win32_sha1': 'b106d66bcdc8a71ea2cdf5446091327bfdb1bcd7',
   'dawn_gn_version': 'git_revision:2f5f34aced5f9721cda3eef963f4f7d231a0ae99',
@@ -30,7 +25,6 @@ vars = {
   # https://chrome-infra-packages.appspot.com/p/infra/3pp/tools/ninja
   'dawn_ninja_version': 'version:3@1.12.1.chromium.4',
   'dawn_go_version': 'version:3@1.26.6',
-  'dawn_node_version': 'version:2@20.11.0',
   'dawn_agility_sdk_version': 'version:2@1.722.0-preview',
   'dawn_direct3d_warp_version': 'version:3@1.0.21.chromium.1',
   'dawn_bazelisk_version': 'version:3@1.29.0',
@@ -94,9 +88,6 @@ vars = {
   # Checkout LiteRT-LM and its data dependencies.
   # Not actually depended on by Dawn/Tint, only used to run benchmark tests on them.
   'checkout_litert_lm': False,
-
-  # Checkout V8 and its dependencies for standalone builds (e.g. CTS runner).
-  'checkout_v8': False,
 
   # Dependency versions for Android builds.
   # These should be all rolled at once to match the values in Chromium.
@@ -465,99 +456,6 @@ deps = {
     'url': '{chromium_git}/external/github.com/KhronosGroup/EGL-Registry@8e56e86e65687697ef54114cdb1afabdfac756bf',
   },
 
-  # WebGPU CTS - Used both by the dawn_node tests and transitively by Chromium.
-  'third_party/webgpu-cts': {
-    'url': '{chromium_git}/external/github.com/gpuweb/cts@3cc5b73f1c3f1c568bcebd3cbf069cc1aa90a931',
-    'condition': 'build_with_chromium or dawn_standalone',
-  },
-
-  # Dependencies required to build / run WebAssembly bindings
-  'third_party/emsdk': {
-    # Note: Always use an emsdk hash referring to a tagged release, just so
-    # emsdk and emscripten are always in sync with an exact release.
-    'url': '{chromium_git}/external/github.com/emscripten-core/emsdk.git@948c31acd3f369a5da276e33ab2ed57108c165e5',
-    'condition': 'dawn_wasm',
-  },
-
-  # Dependencies required to build / run Dawn NodeJS bindings
-  'third_party/node-api-headers': {
-    'url': '{chromium_git}/external/github.com/nodejs/node-api-headers@d5cfe19da8b974ca35764dd1c73b91d57cd3c4ce',
-    'condition': 'dawn_node',
-  },
-  'third_party/node-addon-api': {
-    'url': '{chromium_git}/external/github.com/nodejs/node-addon-api@1e26dcb52829a74260ec262edb41fc22998669b6',
-    'condition': 'dawn_node',
-  },
-  'third_party/gpuweb': {
-    'url': '{chromium_git}/external/github.com/gpuweb/gpuweb@22507c95ccb9e705eddc7cab8f28aa46b134f5fe',
-    'condition': 'dawn_node',
-  },
-
-  # Node binaries, when dawn_node or dawn_wasm is enabled. Architectures are
-  # listed out explicitly instead of using ${{platform}} because the
-  # architecture that these are fetched on can differ from the architecture that
-  # tests are ultimately run on, such as x64 vs. ARM64 Mac.
-  'third_party/node/linux-amd64': {
-    'packages': [
-      {
-        'package': 'infra/3pp/tools/nodejs/linux-amd64',
-        'version': Var('dawn_node_version'),
-      },
-    ],
-    'condition': 'checkout_linux and (dawn_node or dawn_wasm)',
-    'dep_type': 'cipd',
-  },
-  'third_party/node/linux-arm64': {
-    'packages': [
-      {
-        'package': 'infra/3pp/tools/nodejs/linux-arm64',
-        'version': Var('dawn_node_version'),
-      },
-    ],
-    'condition': 'checkout_linux and (dawn_node or dawn_wasm)',
-    'dep_type': 'cipd',
-  },
-  'third_party/node/mac-amd64': {
-    'packages': [
-      {
-        'package': 'infra/3pp/tools/nodejs/mac-amd64',
-        'version': Var('dawn_node_version'),
-      },
-    ],
-    'condition': 'checkout_mac and (dawn_node or dawn_wasm)',
-    'dep_type': 'cipd',
-  },
-  'third_party/node/mac-arm64': {
-    'packages': [
-      {
-        'package': 'infra/3pp/tools/nodejs/mac-arm64',
-        'version': Var('dawn_node_version'),
-      },
-    ],
-    'condition': 'checkout_mac and (dawn_node or dawn_wasm)',
-    'dep_type': 'cipd',
-  },
-  'third_party/node/windows-amd64': {
-    'packages': [
-      {
-        'package': 'infra/3pp/tools/nodejs/windows-amd64',
-        'version': Var('dawn_node_version'),
-      },
-    ],
-    'condition': 'checkout_win and (dawn_node or dawn_wasm)',
-    'dep_type': 'cipd',
-  },
-  'third_party/node/windows-arm64': {
-    'packages': [
-      {
-        'package': 'infra/3pp/tools/nodejs/windows-arm64',
-        'version': Var('dawn_node_version'),
-      },
-    ],
-    'condition': 'checkout_win and (dawn_node or dawn_wasm)',
-    'dep_type': 'cipd',
-  },
-
   # Upstream webgpu.h headers for testing purposes
   'third_party/webgpu-headers/src': {
     'url': '{chromium_git}/external/github.com/webgpu-native/webgpu-headers@a1dc77409bb2b8bd80540cbf4b8db219e123e909',
@@ -616,7 +514,7 @@ deps = {
   },
 
   'tools/cmake': {
-    'condition': '(fetch_cmake or dawn_node)',
+    'condition': 'fetch_cmake',
     'packages': [{
       'package': 'infra/3pp/tools/cmake/${{platform}}',
       'version': Var('dawn_cmake_version'),
@@ -828,87 +726,6 @@ deps = {
     'condition': 'checkout_litert_lm',
   },
 
-  # V8 and its dependencies for standalone builds.
-  'third_party/v8/src': {
-    'url': '{chromium_git}/v8/v8.git@4af304604fe4ff83a0e3f31f54fecf64eac2dbe3',
-    'condition': 'dawn_standalone and checkout_v8',
-  },
-
-  'third_party/fp16/src': {
-    'url': '{chromium_git}/external/github.com/Maratyszcza/FP16.git@782eea126dc5c755827be751a099eb01826175cf',
-    'condition': 'dawn_standalone and checkout_v8',
-  },
-
-  'third_party/fast_float/src': {
-    'url': '{chromium_git}/external/github.com/fastfloat/fast_float.git@dbeabeeb3e6791cb96994c2a7a084c36e62ccfb2',
-    'condition': 'dawn_standalone and checkout_v8',
-  },
-
-  'third_party/fadec/src': {
-    'url': '{chromium_git}/external/github.com/aengelke/fadec.git@c9f78f532b9004de278489019ab2c6c28ae9746e',
-    'condition': 'dawn_standalone and checkout_v8',
-  },
-
-  'third_party/highway/src': {
-    'url': '{chromium_git}/external/github.com/google/highway.git@2607d3b5b0113992fe84d3848859eae13b3b52c1',
-    'condition': 'dawn_standalone and checkout_v8',
-  },
-
-  'third_party/dragonbox/src': {
-    'url': '{chromium_git}/external/github.com/jk-jeon/dragonbox.git@beeeef91cf6fef89a4d4ba5e95d47ca64ccb3a44',
-    'condition': 'dawn_standalone and checkout_v8',
-  },
-
-  'third_party/simdutf/src': {
-    'url': '{chromium_git}/chromium/src/third_party/simdutf@f7356eed293f8208c40b3c1b344a50bd70971983',
-    'condition': 'dawn_standalone and checkout_v8',
-  },
-
-  'third_party/boringssl/src': {
-    'url': '{boringssl_git}/boringssl.git@10c780b1a3f67f9b8269502833808942979d5004',
-    'condition': 'dawn_standalone and checkout_v8',
-  },
-
-  'third_party/nasm/src': {
-    'url': '{chromium_git}/chromium/deps/nasm.git@525a09a813be0f75b646ee93fc2a31c27b87d722',
-    'condition': 'dawn_standalone and checkout_v8',
-  },
-
-  'third_party/llvm-libclang': {
-    'dep_type': 'gcs',
-    'bucket': 'chromium-browser-clang',
-    'condition': 'dawn_standalone and checkout_v8',
-    'objects': [
-      {
-        'object_name': 'Linux_x64/rust-libclang-96a18bf5ffa2b24f9cf3d1c731a9eb121c1acad9-5-llvmorg-24-init-17044-gc3223914.tar.xz',
-        'sha256sum': 'bdfa70274badca548d73b95f353ebc6451c96c6ada1e561c6da880f857f21bb6',
-        'size_bytes': 23186936,
-        'generation': 1794385350228067,
-        'condition': 'host_os == "linux" and non_git_source',
-      },
-      {
-        'object_name': 'Mac/rust-libclang-96a18bf5ffa2b24f9cf3d1c731a9eb121c1acad9-5-llvmorg-24-init-17044-gc3223914.tar.xz',
-        'sha256sum': 'daa332f90f0237bd1389cfa482957eee5f08cd341c42b3c0f7ec9ee96cf90544',
-        'size_bytes': 23333728,
-        'generation': 1794385354028288,
-        'condition': 'host_os == "mac" and host_cpu == "x64"',
-      },
-      {
-        'object_name': 'Mac_arm64/rust-libclang-96a18bf5ffa2b24f9cf3d1c731a9eb121c1acad9-5-llvmorg-24-init-17044-gc3223914.tar.xz',
-        'sha256sum': '4bfdfe46686aa3c1f8f6fd9447fac5e37e699bccf213138b279c99a71c732a03',
-        'size_bytes': 20988176,
-        'generation': 1794385358033896,
-        'condition': 'host_os == "mac" and host_cpu == "arm64"',
-      },
-      {
-        'object_name': 'Win/rust-libclang-96a18bf5ffa2b24f9cf3d1c731a9eb121c1acad9-5-llvmorg-24-init-17044-gc3223914.tar.xz',
-        'sha256sum': '7b4dd46967b0a84b83ab6aa6f3999ca18b15926c5f05a481445e47aaed2558e2',
-        'size_bytes': 21906524,
-        'generation': 1794385361865408,
-        'condition': 'host_os == "win"',
-      },
-    ],
-  },
 }
 
 hooks = [
@@ -1082,14 +899,6 @@ hooks = [
     'condition': 'dawn_standalone',
     'action': ['vpython3', 'build/util/lastchange.py',
                '-o', 'build/util/LASTCHANGE'],
-  },
-
-  # Activate emsdk for WebAssembly builds
-  {
-    'name': 'activate_emsdk',
-    'pattern': '.',
-    'condition': 'dawn_wasm',
-    'action': [ 'vpython3', 'tools/activate-emsdk' ],
   },
 
   # Configure remote exec cfg files

@@ -42,7 +42,6 @@ DawnJSONGenerator(
 )
 dawn_add_library(
   dawn_wgpu_utils
-  ENABLE_EMSCRIPTEN
   UTILITY_TARGET dawn_internal_config
   PRIVATE_HEADERS
     "${DAWN_UTILS_GEN_HEADERS}"
@@ -134,7 +133,6 @@ endif ()
 
 dawn_add_library(
   dawn_system_utils
-  ENABLE_EMSCRIPTEN
   UTILITY_TARGET dawn_internal_config
   PRIVATE_HEADERS
     ${private_system_headers}

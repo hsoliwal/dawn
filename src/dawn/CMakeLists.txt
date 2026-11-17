@@ -43,7 +43,6 @@ DawnGenerator(
 dawn_add_library(
     dawn_version
     HEADER_ONLY
-    ENABLE_EMSCRIPTEN
     UTILITY_TARGET dawn_internal_config
     HEADERS
         ${DAWN_VERSION_GEN_HEADERS}
@@ -158,12 +157,9 @@ endif()
 add_subdirectory(partition_alloc)
 add_subdirectory(common)
 add_subdirectory(utils)
-# Only build the rest of Dawn when Emscripten is not the target environment.
-if (NOT EMSCRIPTEN)
-  add_subdirectory(platform)
-  add_subdirectory(native)
-  add_subdirectory(replay)
-endif()
+add_subdirectory(platform)
+add_subdirectory(native)
+add_subdirectory(replay)
 
 if (${DAWN_BUILD_TESTS})
   add_subdirectory(tests)
@@ -180,34 +176,31 @@ endif()
 
 ###############################################################################
 # libdawn_proc
-#   Only built when not building for Emscripten
 ###############################################################################
 
-if (NOT EMSCRIPTEN)
-  DawnJSONGenerator(
-      TARGET "proc"
-      PRINT_NAME "Dawn C++ wrapper"
-      OUTPUT_SOURCES DAWNPROC_GEN_SOURCES
-  )
+DawnJSONGenerator(
+    TARGET "proc"
+    PRINT_NAME "Dawn C++ wrapper"
+    OUTPUT_SOURCES DAWNPROC_GEN_SOURCES
+)
 
-  dawn_add_library(
-    dawn_proc
-    UTILITY_TARGET dawn_internal_config
-    HEADERS
-      "${DAWN_INCLUDE_DIR}/dawn/dawn_thread_dispatch_proc.h"
-      "${DAWN_INCLUDE_DIR}/dawn/dawn_proc.h"
-    SOURCES
-      "${DAWNPROC_GEN_SOURCES}"
-    DEPENDS
-      dawn::dawn_headers
-    PRIVATE_DEPENDS
-      dawn::dawn_common
-  )
-  target_compile_definitions(dawn_proc PRIVATE "WGPU_IMPLEMENTATION")
-endif()
+dawn_add_library(
+  dawn_proc
+  UTILITY_TARGET dawn_internal_config
+  HEADERS
+    "${DAWN_INCLUDE_DIR}/dawn/dawn_thread_dispatch_proc.h"
+    "${DAWN_INCLUDE_DIR}/dawn/dawn_proc.h"
+  SOURCES
+    "${DAWNPROC_GEN_SOURCES}"
+  DEPENDS
+    dawn::dawn_headers
+  PRIVATE_DEPENDS
+    dawn::dawn_common
+)
+target_compile_definitions(dawn_proc PRIVATE "WGPU_IMPLEMENTATION")
 
 ###############################################################################
-# Other generated files (upstream header, emscripten header, emscripten bits)
+# Other generated files (upstream header)
 ###############################################################################
 
 DawnJSONGenerator(
