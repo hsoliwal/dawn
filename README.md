@@ -20,14 +20,15 @@ Dawn provides several WebGPU building blocks:
    - The `webgpu.h` version that Dawn implements.
    - A C++ wrapper for the `webgpu.h`.
  - **A "native" implementation of WebGPU** using platforms' GPU APIs: D3D12, Metal, Vulkan and OpenGL. See [per API support](docs/support.md) for more details.
- - **A client-server implementation of WebGPU** for applications that are in a sandbox without access to native drivers
  - **Tint** is a compiler for the WebGPU Shader Language (WGSL) that can be used in standalone to convert shaders from and to WGSL.
 
 <!-- fork-homepage-guide:begin -->
 ## Start here in this fork
 
 This is [hsoliwal's fork](https://github.com/hsoliwal/dawn) of
-[google/dawn](https://github.com/google/dawn). It is useful for learning the native
+[google/dawn](https://github.com/google/dawn). Its maintained build path is native CMake:
+Chromium browser, Node.js, Emscripten, GN, and the `dawn_wire` client/server
+layer have been removed. Native `webgpu.h`, GPU backends, and Tint remain. It is useful for learning the native
 WebGPU stack, integrating Dawn into a C++ application, and following a request from
 validation through backend execution. At the reviewed fork default
 [`62fa085`](https://github.com/hsoliwal/dawn/commit/62fa0852b8dec9966d9621f2dd6e7aea51f1a01d),
@@ -42,13 +43,11 @@ or a support/performance claim. The build badge above belongs to upstream.
 | WebGPU API | Application-visible objects, descriptors and operations | [API model](src/dawn/dawn.json) |
 | Adapter / device | Discover capabilities, then create the execution/resource context | [CMake application example](docs/quickstart-cmake.md) |
 | Dawn Native | Shared validation and backend implementations | [Native source](src/dawn/native/) |
-| Dawn Wire | Serialize calls across a client/server boundary | [Wire source](src/dawn/wire/) |
 | Tint / WGSL | Compile WebGPU shaders toward backend shader forms | [Tint source](src/tint/) |
 | Generated code | Headers, wrappers and dispatch derived from inputs | [Code-generation guide](docs/dawn/codegen.md) |
 
 A useful reading path is application → WebGPU API → native validation → backend
-→ driver/GPU. A wire boundary can sit before the native implementation; Tint
-handles shader translation. This is a component map, not a promise that every
+→ driver/GPU. Tint handles shader translation without a browser or wire process. This is a component map, not a promise that every
 operation follows an identical call stack.
 
 ### Quickstart: build a local CMake install
