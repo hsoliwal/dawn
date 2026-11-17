@@ -4,7 +4,7 @@
 
 ## What is in this fork?
 
-Dawn implements WebGPU for native applications and larger systems such as Chromium. This public fork inherits Dawn and Tint; this guide adds navigation, not a new backend, support promise, or benchmark result. Read the upstream [contribution process](../CONTRIBUTING.md), [license](../LICENSE), and README disclaimer before reusing or contributing material.
+Upstream Dawn implements WebGPU for native applications and larger systems such as Chromium. This fork retains Dawn Native and Tint, but has removed browser targets, the Chromium GN build, Node.js bindings and `dawn_wire`; this guide adds navigation, not a new backend, support promise, or benchmark result. Read the upstream [contribution process](../CONTRIBUTING.md), [license](../LICENSE), and README disclaimer before reusing or contributing material.
 
 Choose a route:
 
@@ -18,15 +18,14 @@ Choose a route:
 
 | Component | Job | Source |
 | --- | --- | --- |
-| API model and generators | Describe the API and produce headers, wrappers, proc tables, and wire code | [dawn.json](../src/dawn/dawn.json), [generator](../generator) |
+| API model and generators | Describe the API and produce headers, wrappers, proc tables and native helpers | [dawn.json](../src/dawn/dawn.json), [generator](../generator) |
 | Dawn Native frontend | Shared API validation and state tracking | [src/dawn/native](../src/dawn/native) |
 | Native backends | Translate work to platform GPU APIs | Backend subdirectories under native |
-| Dawn Wire | Serialize client commands and dispatch them on the server; return callbacks | [src/dawn/wire](../src/dawn/wire) |
 | Dawn Proc | Dispatch through a function table to a selected implementation | [Overview: Dawn Proc](dawn/overview.md#dawn-proc-dawn_proc) |
 | Tint | Translate WGSL into shader forms used by native backends | [src/tint](../src/tint) |
 | Tests and samples | Exercise internal behavior, validation, GPU execution, and examples | [src/dawn/tests](../src/dawn/tests), [samples](../src/dawn/samples) |
 
-A useful mental model is application -> WebGPU API -> native frontend -> selected backend -> driver/GPU. A wire client/server boundary may sit before the native implementation. Tint supplies shader translation within this larger path. These are responsibilities, not a literal stack trace for every call.
+A useful mental model is application -> WebGPU API -> native frontend -> selected backend -> driver/GPU. This fork has no wire client/server boundary; Tint supplies shader translation within the native path. These are responsibilities, not a literal stack trace for every call.
 
 Some headers and implementations are generated. If a header is missing from a source-only checkout, read [code generation](dawn/codegen.md) and the build rules before assuming it was deleted.
 
@@ -34,7 +33,7 @@ Some headers and implementations are generated. If a header is missing from a so
 
 The checked-out [CMakeLists.txt](../CMakeLists.txt) requires **CMake 3.22 or later**. Prefer the build-system requirement if prose from another revision disagrees.
 
-The [build guide](building.md) also specifies Git, Python 3, Go 1.23+, a C++20 compiler, and Ninja 1.12 or an alternative CMake-supported build tool. GN development uses depot_tools; platform SDKs, compiler versions, and Linux packages are detailed in that guide. Node.js/npm are needed for `dawn.node`, not for every native use.
+The [build guide](building.md) also specifies Git, Python 3, Go 1.23+, a C++20 compiler, and Ninja 1.12 or an alternative CMake-supported build tool. This fork builds with CMake, not GN/depot_tools, and has no `dawn.node` target. Platform SDKs, compiler versions and Linux packages are detailed in the guide.
 
 Dependency fetching uses network access and can download substantial toolchains. Read the build guide's dependency license notice, including Direct3D WARP, before fetching. This guide does not accept those terms for you.
 
@@ -67,7 +66,6 @@ Do not mix generators or toolchain configurations in one output directory. The d
 | Question | Test layer | What it does not establish |
 | --- | --- | --- |
 | Internal logic or API validation? | Dawn unit/validation tests | Actual GPU execution |
-| Wire behavior? | Wire unit tests | Every native driver/backend combination |
 | Native execution? | Dawn end-to-end tests | All GPUs or operating systems |
 | Shader translation? | Tint unit and end-to-end tests | Whole-application correctness |
 | Speed? | [Performance tests](dawn/testing.md#dawn-perf-tests) | Comparable results without controlled settings |
@@ -107,7 +105,7 @@ For an application-level smoke check, use the complete adapter-request example i
 
 A useful report includes commit, dependency/setup route, compiler and CMake versions, build options, OS/GPU/backend, exact command, expected/actual result, and the smallest relevant log excerpt. Remove credentials and private paths.
 
-Public source and documentation were inspected on 2026-10-14. These commands were not executed, and no build, test, conformance, or performance success is claimed. Fork documentation PRs do not replace upstream Gerrit review or its contributor requirements.
+The original documentation inspection was on 2026-10-14. Browser-removal references here have since been reconciled with merged fork changes on 2026-11-17. The commands shown in this guide were not executed for this documentation change, and no build, test, conformance, or performance success is claimed. Fork documentation PRs do not replace upstream Gerrit review or its contributor requirements.
 
 ## Worked diagnosis and analysis notes
 
