@@ -1,22 +1,29 @@
 # Testing Dawn
 
-(TODO)
+This fork uses CMake for native testing. Chromium GN/depot_tools, browser/Node.js tests and
+the removed `dawn_wire` tests are not available.
 
-## Dawn Perf Tests
+## Native test targets
 
-For benchmarking with `dawn_perf_tests`, it's best to build inside a Chromium checkout using the
-following GN args:
+With the platform toolchain and dependencies installed, configure a dedicated CMake build:
 
+```sh
+cmake -S . -B out/Tests -G Ninja -DDAWN_FETCH_DEPENDENCIES=ON -DDAWN_BUILD_TESTS=ON -DCMAKE_BUILD_TYPE=Debug
+cmake --build out/Tests --target dawn_unittests dawn_end2end_tests
+./out/Tests/dawn_unittests
 ```
-is_official_build = true  # Enables highest optimization level, using LTO on some platforms
-use_dawn = true           # Required to build Dawn
-use_cfi_icall=false       # Required because Dawn dynamically loads function pointers, and we don't
-                          # sanitize them yet.
-```
 
-A Chromium checkout is required for the highest optimization flags. It is possible to build and run
-`dawn_perf_tests` from a standalone Dawn checkout as well, only using GN arg `is_debug=false`. For
-more information on building, please see [building.md](../building.md).
+`dawn_unittests` includes native validation tests; `dawn_end2end_tests` requires an
+appropriate GPU/backend/driver environment. These commands are examples, not executed
+verification results.
+
+## Performance-test sources (not a current CMake target)
+
+Sources under [perf_tests](../../src/dawn/tests/perf_tests) describe Dawn performance
+metrics and benchmarks. The current [test CMake configuration](../../src/dawn/tests/CMakeLists.txt)
+does not define `dawn_perf_tests`, so historical Chromium/GN runner instructions
+must not be used as native build commands.
+
 
 ### Terminology
 
@@ -30,8 +37,7 @@ more information on building, please see [building.md](../building.md).
    `maxStepsInFlight` is passed to the `DawnPerfTestsBase` constructor to limit the number of Steps
    pipelined.
 
-(See [`//src/dawn/tests/perf_tests/DawnPerfTest.h`](https://cs.chromium.org/chromium/src/third_party/dawn/src/dawn/tests/perf_tests/DawnPerfTest.h)
-for the values of the constants).
+(See [DawnPerfTest.h](../../src/dawn/tests/perf_tests/DawnPerfTest.h) for the definitions of these constants.)
 
 ### Metrics
 
@@ -43,26 +49,8 @@ for the values of the constants).
  - `validation_time`: The time for CommandBuffer / RenderBundle validation.
  - `recording_time`: The time to convert Dawn commands to native commands.
 
-Metrics are reported according to the format specified at
-[[chromium]//build/recipes/performance_log_processor.py](https://cs.chromium.org/chromium/build/recipes/performance_log_processor.py)
-
-### Dumping Trace Files
-
-The test harness supports a `--trace-file=path/to/trace.json` argument where Dawn trace events can
-be dumped. The traces can be viewed in Chrome's `about://tracing` viewer.
-
-### Test Runner
-
-[`//scripts/perf_test_runner.py`](https://cs.chromium.org/chromium/src/third_party/dawn/scripts/perf_test_runner.py) may be run to continuously run a test and report mean times and variances.
-
-Currently the script looks in the `out/Release` build directory and measures the `wall_time`
-metric (hardcoded into the script). These should eventually become arguments.
-
-Example usage:
-
-```
-scripts/perf_test_runner.py DrawCallPerf.Run/Vulkan__e_skip_validation
-```
+These metrics describe historical benchmark source conventions; no Chromium reporting pipeline
+or browser tracing tool is required by the native CMake build.
 
 ### Tests
 

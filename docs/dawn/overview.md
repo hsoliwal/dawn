@@ -12,13 +12,12 @@ WebGPU API. It is used to generate the API headers, C++ wrapper, and more!
 - [`generator`](../../generator): directory containg the code generators and their templates.
   Generators are based on Jinja2 and parse data-models from JSON files.
     - [`dawn_json_generator.py`](../../generator/dawn_json_generator.py): the main code generator
-      that outputs the WebGPU headers, C++ wrapper, client-server implementation, etc.
+      that outputs the WebGPU headers, C++ wrapper, proc tables and native helpers.
     - [`templates`](../../generator/templates): Jinja2 templates for the generator, with
       subdirectories for groups of templates that are all used in the same library.
 - [`include`](../../include):
     - [`dawn`](../../include/dawn): public headers with subdirectories for each library. Note that
       some headers are auto-generated and not present directly in the directory.
-- [`infra`](../../infra): configuration file for the commit-queue infrastructure.
 - [`scripts`](../../scripts): contains a grab-bag of files that are used for building Dawn, in
   testing, etc.
 - [`src`](../../src):
@@ -61,32 +60,15 @@ SPIR-V shaders and uses [Tint](../../src/tint) shader translator to convert WGSL
 equivalent shader for use in the native graphics API (HLSL for D3D12, MSL for Metal or Vulkan
 SPIR-V for Vulkan).
 
-## Dawn Wire (`dawn_wire`)
-
-A second library that implements both a client that takes WebGPU commands and serializes them into a
-buffer, and a server that deserializes commands from a buffer, validates they are well-formed and
-calls the relevant WebGPU commands. Some server to client communication also happens so the API's
-callbacks work properly.
-
-Note that `dawn_wire` is meant to do as little state-tracking as possible so that the client can be
-lean and defer most of the heavy processing to the server side where the server calls into
-`dawn_native`.
-
 ## Dawn Proc (`dawn_proc`)
 
-Normally libraries implementing `webgpu.h` should implement function like `wgpuDeviceCreateBuffer`
-but instead `dawn_native` and `dawn_wire` implement the `dawnProcTable` which is a structure
-containing all the WebGPU functions Dawn implements. Then a `dawn_proc` library contains a static
-version of this `dawnProcTable` and for example forwards `wgpuDeviceCreateBuffer` to the
-`procTable.deviceCreateBuffer` function pointer. This is useful in two ways:
-
- - It allows deciding at runtime whether to use `dawn_native` and `dawn_wire`, which is useful to
-   test both paths with the same binary in our infrastructure.
- - It avoids applications that know they will only use Dawn to query all entrypoints at once instead
-   of using `wgpuGetProcAddress` repeatedly.
+Dawn's generated proc table dispatches WebGPU entrypoints to the native implementation. The
+`dawn_proc` support forwards C API calls through that table, allowing native callers to use
+Dawn without repeatedly resolving each entrypoint with `wgpuGetProcAddress`. The Chromium
+client/server `dawn_wire` implementation is absent from this fork.
 
 ## Code generation
 
 When the WebGPU API evolves, a lot of places in Dawn have to be updated, so to reduce efforts, Dawn
-relies heavily on code generation for things like headers, proc tables and de/serialization. For
+relies heavily on code generation for headers, proc tables and native validation support. For
 more information, see [codegen.md](codegen.md).
