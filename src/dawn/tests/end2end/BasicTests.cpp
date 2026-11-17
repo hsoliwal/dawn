@@ -82,12 +82,7 @@ TEST_P(BasicTests, GetInstanceLimits) {
     wgpu::InstanceLimits out{};
     auto status = wgpu::GetInstanceLimits(&out);
     EXPECT_EQ(status, wgpu::Status::Success);
-    if (UsesWire()) {
-        // The wire's limit is just the max size value.
-        EXPECT_EQ(out.timedWaitAnyMaxCount, std::numeric_limits<size_t>::max());
-    } else {
-        EXPECT_EQ(out.timedWaitAnyMaxCount, kTimedWaitAnyMaxCountDefault);
-    }
+    EXPECT_EQ(out.timedWaitAnyMaxCount, kTimedWaitAnyMaxCountDefault);
     EXPECT_EQ(out.nextInChain, nullptr);
 
     wgpu::ChainedStructOut chained{};
@@ -109,17 +104,8 @@ TEST_P(BasicTests, GetInstanceFeatures) {
     auto features =
         std::unordered_set(out.features, DAWN_UNSAFE_TODO(out.features + out.featureCount));
 
-    if (UsesWire()) {
-        // Wire exposes a subset of features.
-        static const auto kWireFeatures = std::unordered_set{
-            wgpu::InstanceFeatureName::TimedWaitAny,
-        };
-        EXPECT_EQ(features, kWireFeatures);
-    } else {
-        // Native (currently) exposes all known features.
-        EXPECT_EQ(features, kKnownFeatures);
-    }
-
+    // Native (currently) exposes all known features.
+    EXPECT_EQ(features, kKnownFeatures);
     // Check that GetInstanceFeatures and HasInstanceFeature match.
     for (auto feature : kKnownFeatures) {
         EXPECT_EQ(features.contains(feature), wgpu::HasInstanceFeature(feature));

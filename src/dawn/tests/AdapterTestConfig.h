@@ -41,13 +41,10 @@ struct BackendTestConfig {
                                std::initializer_list<const char*> forceEnabledWorkarounds = {},
                                std::initializer_list<const char*> forceDisabledWorkarounds = {});
 
-    BackendTestConfig EnableSharedMemoryInWire() const;
-
     wgpu::BackendType backendType;
 
     std::vector<const char*> forceEnabledWorkarounds;
     std::vector<const char*> forceDisabledWorkarounds;
-    bool enableSharedMemoryInWire = false;
 };
 
 struct TestAdapterProperties {
@@ -82,7 +79,6 @@ struct AdapterTestParam {
     TestAdapterProperties adapterProperties;
     std::vector<const char*> forceEnabledWorkarounds;
     std::vector<const char*> forceDisabledWorkarounds;
-    bool enableSharedMemoryInWire = false;
 };
 
 std::ostream& operator<<(std::ostream& os, const AdapterTestParam& param);

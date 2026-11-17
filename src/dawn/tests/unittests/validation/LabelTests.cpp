@@ -38,7 +38,6 @@ namespace {
 class LabelTest : public ValidationTest {
     void SetUp() override {
         ValidationTest::SetUp();
-        DAWN_SKIP_TEST_IF(UsesWire());
     }
 };
 
@@ -328,7 +327,6 @@ TEST_F(LabelTest, PipelineLayout) {
 }
 
 TEST_F(LabelTest, QuerySet) {
-    DAWN_SKIP_TEST_IF(UsesWire());
     std::string label = "test";
     wgpu::QuerySetDescriptor descriptor;
     descriptor.type = wgpu::QueryType::Occlusion;

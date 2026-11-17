@@ -437,7 +437,7 @@ TEST_P(BufferMappingValidationTest, MapAsync_AlreadyMapped) {
 TEST_P(BufferMappingValidationTest, MapAsync_PendingMap) {
     // TODO(crbug.com/42241221): Inject a validation error from the wire client, so that behavior
     // is consistent between native and wire.
-    bool validationError = !UsesWire();
+    bool validationError = true;
 
     // Overlapping range
     {
@@ -642,7 +642,6 @@ TEST_P(BufferMappingValidationTest, DestroyDeviceWhilePending) {
 TEST_P(BufferMappingValidationTest, DestroyDeviceAfterMapping) {
     // TODO(https://crbug.com/42240407): Unmap buffers in the wire client when
     // device.Destroy() is called.
-    DAWN_SKIP_TEST_IF(UsesWire());
 
     wgpu::Buffer buffer = CreateBuffer(4);
 
@@ -697,7 +696,6 @@ TEST_F(BufferValidationTest, MappedAtCreationOOM) {
 TEST_F(BufferValidationTest, MappedAtCreationThenDestroyDevice) {
     // TODO(https://crbug.com/42240407): Unmap buffers in the wire client when
     // device.Destroy() is called.
-    DAWN_SKIP_TEST_IF(UsesWire());
 
     wgpu::Buffer buffer = BufferMappedAtCreation(4, wgpu::BufferUsage::CopySrc);
 
@@ -1320,7 +1318,6 @@ TEST_P(BufferMappingValidationTest, GetMapState) {
 class BufferMapExtendedUsagesValidationTest : public BufferValidationTest {
   protected:
     void SetUp() override {
-        DAWN_SKIP_TEST_IF(UsesWire());
         BufferValidationTest::SetUp();
     }
 
@@ -1379,7 +1376,6 @@ TEST_F(BufferMapExtendedUsagesValidationTest, CreationMapUsageReadOrWriteNoRestr
 class BufferMapWriteExtendedUsagesValidationTest : public BufferValidationTest {
   protected:
     void SetUp() override {
-        DAWN_SKIP_TEST_IF(UsesWire());
         BufferValidationTest::SetUp();
     }
 
@@ -1432,7 +1428,6 @@ TEST_F(BufferMapWriteExtendedUsagesValidationTest, CreationMapReadRestrictionsSt
 class BufferMapExtendedAndWriteExtendedUsagesValidationTest : public BufferValidationTest {
   protected:
     void SetUp() override {
-        DAWN_SKIP_TEST_IF(UsesWire());
         BufferValidationTest::SetUp();
     }
 

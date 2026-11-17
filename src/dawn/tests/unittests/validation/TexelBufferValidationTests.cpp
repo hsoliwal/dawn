@@ -315,7 +315,6 @@ TEST_F(TexelBufferValidationTest, AdditionalChain) {
 class TexelBufferValidationWithExtendedMapTest : public TexelBufferValidationTest {
   protected:
     void SetUp() override {
-        DAWN_SKIP_TEST_IF(UsesWire());
         TexelBufferValidationTest::SetUp();
         DAWN_SKIP_TEST_IF(!adapter.HasFeature(wgpu::FeatureName::BufferMapExtendedUsages));
     }

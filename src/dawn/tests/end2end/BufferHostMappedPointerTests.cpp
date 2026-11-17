@@ -48,7 +48,6 @@ std::vector<wgpu::FeatureName> BufferHostMappedPointerTests::GetRequiredFeatures
 }
 
 void BufferHostMappedPointerTests::SetUp() {
-    DAWN_TEST_UNSUPPORTED_IF(UsesWire());
     DawnTestWithParams<BufferHostMappedPointerTestParams>::SetUp();
     DAWN_TEST_UNSUPPORTED_IF(!SupportsFeatures({wgpu::FeatureName::HostMappedPointer}));
 
@@ -69,7 +68,6 @@ using ::testing::HasSubstr;
 class BufferHostMappedPointerNoFeatureTests : public DawnTest {
     void SetUp() override {
         DawnTest::SetUp();
-        DAWN_TEST_UNSUPPORTED_IF(UsesWire());
     }
 };
 

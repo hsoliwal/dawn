@@ -178,9 +178,6 @@ TEST_F(RenderPassDescriptorValidationTest, ColorAttachmentOutOfBounds) {
 // Test that colorAttachmentCount is checked before dereferencing colorAttachments.
 TEST_F(RenderPassDescriptorValidationTest, ColorAttachmentCountOverLimitsNotAccessed) {
     // This is a test for dawn::native only.
-    if (UsesWire()) {
-        GTEST_SKIP();
-    }
 
     // Check that colorAttachments is not accessed if their count is higher that the color
     // attachment limit.
@@ -2665,7 +2662,6 @@ class RenderPassRenderAreaValidationTests : public RenderPassDescriptorValidatio
     static constexpr uint16_t kSize = 16;
 
     void SetUp() override {
-        DAWN_SKIP_TEST_IF(UsesWire());
         RenderPassDescriptorValidationTest::SetUp();
     }
 

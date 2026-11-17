@@ -201,8 +201,7 @@ class BufferMapExtendedUsagesPerf : public DawnPerfTestWithParams<BufferUploadPa
 
 std::vector<wgpu::FeatureName> BufferMapExtendedUsagesPerf::GetRequiredFeatures() {
     std::vector<wgpu::FeatureName> requiredFeatures = DawnPerfTestWithParams::GetRequiredFeatures();
-    if (!UsesWire() && GetParam().uploadMethod == UploadMethod::MapWithExtendedUsages &&
-        SupportsFeatures({wgpu::FeatureName::BufferMapExtendedUsages})) {
+    if (GetParam().uploadMethod == UploadMethod::MapWithExtendedUsages && SupportsFeatures({wgpu::FeatureName::BufferMapExtendedUsages})) {
         requiredFeatures.push_back(wgpu::FeatureName::BufferMapExtendedUsages);
     }
     return requiredFeatures;

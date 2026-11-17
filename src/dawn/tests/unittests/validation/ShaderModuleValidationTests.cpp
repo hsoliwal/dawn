@@ -327,7 +327,6 @@ TEST_F(ShaderModuleValidationTest, ShaderModuleCompilationOptionsNoFeature) {
 TEST_F(ShaderModuleValidationTest, GetCompilationMessages) {
     // This test works assuming ShaderModule is backed by a native::ShaderModuleBase, which
     // is not the case on the wire.
-    DAWN_SKIP_TEST_IF(UsesWire());
 
     wgpu::ShaderModule shaderModule = utils::CreateShaderModule(device, R"(
         @fragment fn main() -> @location(0) vec4f {
@@ -409,7 +408,6 @@ TEST_F(ShaderModuleValidationTest, GetCompilationMessages) {
 TEST_F(ShaderModuleValidationTest, GetCompilationMessages_InvalidUTF8) {
     // This test works assuming ShaderModule is backed by a native::ShaderModuleBase, which
     // is not the case on the wire.
-    DAWN_SKIP_TEST_IF(UsesWire());
 
     std::string shaderSrc =
         std::string(R"(const offset: u32`= 17;
@@ -693,7 +691,6 @@ TEST_F(ShaderModuleValidationTest, CreateErrorShaderModule) {
             ASSERT_EQ(0u, message->linePos);
         });
 
-    FlushWire();
 }
 
 // Test that creating shader modules with invalid UTF-8 is an error.
@@ -996,7 +993,6 @@ class ShaderModuleExtensionValidationTest : public ValidationTest {
     // Skip tests if using Wire, because some features are not supported by the wire and cause the
     // device creation failed.
     void SetUp() override {
-        DAWN_SKIP_TEST_IF(UsesWire());
         ValidationTest::SetUp();
     }
 

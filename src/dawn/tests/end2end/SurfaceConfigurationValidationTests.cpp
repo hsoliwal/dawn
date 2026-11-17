@@ -66,7 +66,6 @@ class SurfaceConfigurationValidationTests : public DawnTest {
   public:
     void SetUp() override {
         DawnTest::SetUp();
-        DAWN_TEST_UNSUPPORTED_IF(UsesWire());
         DAWN_TEST_UNSUPPORTED_IF(HasToggleEnabled("skip_validation"));
 
         glfwSetErrorCallback([](int code, const char* message) {

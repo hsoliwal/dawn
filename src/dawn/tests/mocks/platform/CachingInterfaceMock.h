@@ -41,10 +41,8 @@
 
 #define EXPECT_CACHE_HIT(cache, N, statement) \
     do {                                      \
-        FlushWire();                          \
         size_t before = cache.GetHitCount();  \
         statement;                            \
-        FlushWire();                          \
         size_t after = cache.GetHitCount();   \
         EXPECT_EQ(N, after - before);         \
     } while (0)
@@ -58,11 +56,9 @@
         using Add = dawn::TypedInteger<struct AddT, size_t>;                \
         static_assert(std::is_same_v<decltype(HitN), Hit>);                 \
         static_assert(std::is_same_v<decltype(AddN), Add>);                 \
-        FlushWire();                                                        \
         size_t hitBefore = cache.GetHitCount();                             \
         size_t entriesBefore = cache.GetNumEntries();                       \
         statement;                                                          \
-        FlushWire();                                                        \
         size_t hitAfter = cache.GetHitCount();                              \
         size_t entriesAfter = cache.GetNumEntries();                        \
         EXPECT_EQ(static_cast<size_t>(HitN), hitAfter - hitBefore);         \

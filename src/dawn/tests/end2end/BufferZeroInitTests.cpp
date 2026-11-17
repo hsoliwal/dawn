@@ -46,18 +46,14 @@ using ::testing::HasSubstr;
 // Expect lazy clear count for test in device to increment by N after `statement`.
 // Note: WebGPU backend doesn't maintain the lazy clear count for testing but rely on the inner
 // layer implementation for the initialization.
-#define EXPECT_LAZY_CLEAR(N, statement)                                                  \
-    do {                                                                                 \
-        if (UsesWire()) {                                                                \
-            statement;                                                                   \
-        } else {                                                                         \
-            size_t lazyClearsBefore = native::GetLazyClearCountForTesting(device.Get()); \
-            statement;                                                                   \
-            size_t lazyClearsAfter = native::GetLazyClearCountForTesting(device.Get());  \
-            if (!IsWebGPUOnWebGPU()) {                                                   \
-                EXPECT_EQ(N, lazyClearsAfter - lazyClearsBefore);                        \
-            }                                                                            \
-        }                                                                                \
+#define EXPECT_LAZY_CLEAR(N, statement)                                              \
+    do {                                                                             \
+        size_t lazyClearsBefore = native::GetLazyClearCountForTesting(device.Get()); \
+        statement;                                                                   \
+        size_t lazyClearsAfter = native::GetLazyClearCountForTesting(device.Get());  \
+        if (!IsWebGPUOnWebGPU()) {                                                   \
+            EXPECT_EQ(N, lazyClearsAfter - lazyClearsBefore);                        \
+        }                                                                            \
     } while (0)
 
 struct BufferZeroInitInCopyT2BSpec {

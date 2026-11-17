@@ -187,7 +187,7 @@ TEST_P(SinglePipelineCachingTests, ComputePipelineFrontendCache) {
     wgpu::ComputePipeline samePipeline;
     EXPECT_CACHE_STATS(mMockCache, Hit(0u), Add(0u),
                        samePipeline = device.CreateComputePipeline(&desc));
-    EXPECT_EQ(pipeline.Get() == samePipeline.Get(), !UsesWire());
+    EXPECT_EQ(pipeline.Get(), samePipeline.Get());
 }
 
 // Tests that pipeline creation hits the cache when it is enabled.
@@ -349,7 +349,7 @@ TEST_P(SinglePipelineCachingTests, RenderPipelineFrontendCache) {
     wgpu::RenderPipeline samePipeline;
     EXPECT_CACHE_STATS(mMockCache, Hit(0u), Add(0u),
                        samePipeline = device.CreateRenderPipeline(&desc));
-    EXPECT_EQ(pipeline.Get() == samePipeline.Get(), !UsesWire());
+    EXPECT_EQ(pipeline.Get(), samePipeline.Get());
 }
 
 // Tests that pipeline creation hits the cache when it is enabled.

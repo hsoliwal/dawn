@@ -502,7 +502,6 @@ set(BUILD_SHARED_LIBS ${BUILD_SHARED_LIBS_SAVED})
 if (DAWN_ENABLE_D3D11 OR DAWN_ENABLE_D3D12 OR DAWN_ENABLE_METAL OR DAWN_ENABLE_NULL OR DAWN_ENABLE_DESKTOP_GL OR DAWN_ENABLE_OPENGLES OR DAWN_ENABLE_VULKAN)
     add_subdirectory(generator)
     add_subdirectory(src/dawn)
-    add_subdirectory(src/dawn/fuzzers)
 endif()
 
 ################################################################################

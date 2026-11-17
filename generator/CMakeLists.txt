@@ -182,8 +182,6 @@ function(DawnJSONGenerator)
         EXTRA_PARAMETERS
              --dawn-json
              "${Dawn_SOURCE_DIR}/src/dawn/dawn.json"
-             --wire-json
-             "${Dawn_SOURCE_DIR}/src/dawn/dawn_wire.json"
              --native-json
              "${Dawn_SOURCE_DIR}/src/dawn/dawn_native.json"
              --kotlin-json

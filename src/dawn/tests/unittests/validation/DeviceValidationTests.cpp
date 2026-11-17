@@ -53,7 +53,6 @@ class RequestDeviceValidationTest : public ValidationTest {
 
     void SetUp() override {
         ValidationTest::SetUp();
-        DAWN_SKIP_TEST_IF(UsesWire());
     }
 
     MockCppCallback<wgpu::RequestDeviceCallback<void>*> mRequestDeviceCallback;
@@ -345,7 +344,6 @@ TEST_F(DeviceTickValidationTest, DestroyDeviceBeforeAPITick) {
 class DeviceGetAHardwareBufferPropertiesValidationTest : public ValidationTest {
     void SetUp() override {
         ValidationTest::SetUp();
-        DAWN_SKIP_TEST_IF(UsesWire());
     }
 };
 
@@ -456,7 +454,6 @@ class RequestDeviceWithImmediateDataValidationTest : public ValidationTest {
   protected:
     void SetUp() override {
         ValidationTest::SetUp();
-        DAWN_SKIP_TEST_IF(UsesWire());
     }
 
     MockCppCallback<void (*)(wgpu::RequestDeviceStatus, wgpu::Device, wgpu::StringView)>

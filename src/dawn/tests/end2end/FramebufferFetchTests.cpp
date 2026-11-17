@@ -506,7 +506,6 @@ TEST_P(FramebufferFetchTests, MultisamplingIsSampleRasterization) {
 // concurrently for the same number of color attachments.
 TEST_P(FramebufferFetchTests, CreateRenderPipelineInParallel) {
     // TODO(crbug.com/42240634): DawnWire doesn't support thread safe API yet.
-    DAWN_TEST_UNSUPPORTED_IF(UsesWire());
 
     constexpr uint32_t kNumThreads = 16;
 

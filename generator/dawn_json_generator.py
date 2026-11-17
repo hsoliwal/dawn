@@ -58,124 +58,6 @@ def parse_json(json, enabled_tags, disabled_tags=None, addins=None):
 
 
 ############################################################
-# WIRE STUFF
-############################################################
-
-
-class Command(Record):
-
-    def __init__(self, name, members=None):
-        Record.__init__(self, name)
-        self.members = members or []
-        self.derived_object = None
-        self.derived_method = None
-
-
-# Create wire commands from api methods
-def compute_wire_params(api_params, wire_json):
-    wire_params = api_params.copy()
-    types = wire_params['types']
-
-    commands = []
-    return_commands = []
-    special_commands = []
-
-    wire_json['special items']['client_handwritten_commands'] += wire_json[
-        'special items']['client_side_commands']
-
-    # Generate commands from object methods
-    for api_object in wire_params['by_category']['object']:
-        # Reference counting functions are generated separately, so label them as "handwritten".
-        wire_json['special items']['client_handwritten_commands'] += [
-            api_object.name.CamelCase() + 'AddRef',
-            api_object.name.CamelCase() + 'Release'
-        ]
-
-        for method in api_object.methods:
-            command_name = concat_names(api_object.name, method.name)
-            command_suffix = Name(command_name).CamelCase()
-
-            # Only object return values, status or void are supported:
-            #
-            #- "void" is not a return value so commands can just be pushed to the server.
-            # - objects use the wire's "promise pipelining" and will be sent associated with the
-            #   WireHandle provided by the client.
-            # - "status" is used to synchronously return validation errors so the server checks that
-            #   they are always a success.
-            #
-            # Other methods must be handwritten.
-            is_object = method.returns and method.returns.type.category == 'object'
-            is_status = method.returns and method.returns.type.name.canonical_case(
-            ) == 'status'
-            is_void = method.returns == None
-            if not (is_object or is_status or is_void):
-                assert command_suffix in (
-                    wire_json['special items']['client_handwritten_commands']
-                ), command_suffix
-                continue
-
-            if command_suffix in (
-                    wire_json['special items']['client_side_commands']):
-                continue
-
-            # Create object method commands by prepending "self"
-            members = [
-                RecordMember(Name('self'), types[api_object.dict_name],
-                             'value', {})
-            ]
-            members += method.arguments
-
-            # Client->Server commands that return an object return the
-            # result object handle
-            if method.returns and method.returns.type.category == 'object':
-                result = RecordMember(Name('result'),
-                                      types['ObjectHandle'],
-                                      'value', {},
-                                      is_return_value=True)
-                result.set_handle_type(method.returns.type)
-                members.append(result)
-
-            command = Command(command_name, members)
-            command.derived_object = api_object
-            command.derived_method = method
-            commands.append(command)
-
-    # Generate commands from structure methods. Notes that currently this is only FreeMembers.
-    for api_struct in wire_params['by_category']['structure']:
-        wire_json['special items']['client_handwritten_commands'] += [
-            api_struct.name.CamelCase() + 'FreeMembers'
-        ]
-
-    # TODO(crbug.com/575961728): Move or remove these linked_record_members usages so that
-    # linked_record_members can be made private in dawn_json_parsing.py.
-    for (name, json_data) in wire_json['commands'].items():
-        commands.append(Command(name, linked_record_members(json_data, types)))
-
-    for (name, json_data) in wire_json['return commands'].items():
-        return_commands.append(
-            Command(name, linked_record_members(json_data, types)))
-
-    for (name, json_data) in wire_json['special commands'].items():
-        special_commands.append(
-            Command(name, linked_record_members(json_data, types)))
-
-    wire_params['cmd_records'] = {
-        'command': commands,
-        'return command': return_commands,
-        'special command': special_commands
-    }
-
-    for commands in wire_params['cmd_records'].values():
-        for command in commands:
-            command.update_metadata()
-        commands.sort(key=lambda c: c.name.canonical_case())
-
-    wire_params.update(wire_json.get('special items', {}))
-
-    return wire_params
-
-
-############################################################
 # KOTLIN STUFF
 ############################################################
 
@@ -741,15 +623,6 @@ def as_frontendType(metadata, typ):
         return as_cType(metadata.c_prefix, typ.name)
 
 
-def as_wireType(metadata, typ):
-    if typ.category == 'object':
-        return typ.name.CamelCase() + '*'
-    elif typ.category in ['bitmask', 'enum', 'structure']:
-        return metadata.c_prefix + typ.name.CamelCase()
-    else:
-        return as_cppType(typ.name)
-
-
 def c_methods(params, typ):
     if typ.category == 'object':
         return typ.methods + [
@@ -807,15 +680,6 @@ def has_callback_arguments(method):
 
 def has_callbackInfoStruct(args):
     return any(arg.type.category == 'callback info' for arg in args)
-
-
-def is_wire_serializable(type):
-    # Function pointers, callback functions, and "void *" types (i.e. userdata) cannot
-    # be serialized.
-    return (type.category != 'function pointer'
-            and type.category != 'callback info'
-            and type.category != 'callback function'
-            and type.name.get() != 'void *')
 
 
 def is_enum_value_proxy(value):
@@ -907,7 +771,7 @@ class MultiGeneratorFromDawnJSON(Generator):
 
     def add_commandline_arguments(self, parser):
         allowed_targets = [
-            'dawn_headers', 'cpp_headers', 'cpp', 'proc', 'mock_api', 'wire',
+            'dawn_headers', 'cpp_headers', 'cpp', 'proc', 'mock_api',
             'native_utils', 'kotlin'
         ]
 
@@ -922,10 +786,6 @@ class MultiGeneratorFromDawnJSON(Generator):
             nargs='+',
             action='extend',
             help='Additional JSON files with metadata.addins to apply.')
-        parser.add_argument('--wire-json',
-                            default=None,
-                            type=str,
-                            help='The DAWN WIRE JSON definition to use.')
         parser.add_argument('--native-json',
                             default=None,
                             type=str,
@@ -965,12 +825,6 @@ class MultiGeneratorFromDawnJSON(Generator):
                                  for addin in extra_addins
                                  for props in addin.values())
 
-        wire_json = None
-        wire_addins = []
-        if args.wire_json:
-            with open(args.wire_json) as f:
-                wire_json = json.loads(f.read())
-            wire_addins = [parse_addin(args.wire_json)]
 
         native_addins = []
         if args.native_json:
@@ -1013,10 +867,6 @@ class MultiGeneratorFromDawnJSON(Generator):
                 FileRender('api.h', 'include/dawn/' + api + '.h',
                            [RENDER_PARAMS_BASE, params_all]))
             renders.append(
-                FileRender('dawn/wire/client/api.h',
-                           'include/dawn/wire/client/' + api + '.h',
-                           [RENDER_PARAMS_BASE, params_dawn]))
-            renders.append(
                 FileRender('dawn_proc_table.h',
                            'include/dawn/' + prefix + '_proc_table.h',
                            [RENDER_PARAMS_BASE, params_dawn]))
@@ -1035,16 +885,6 @@ class MultiGeneratorFromDawnJSON(Generator):
                 ]))
 
             renders.append(
-                FileRender(
-                    'api_cpp.h', 'include/dawn/wire/client/' + api + '_cpp.h',
-                    [
-                        RENDER_PARAMS_BASE, params_dawn, {
-                            'c_header': 'dawn/wire/client/' + api + '.h',
-                            'c_namespace': Name('dawn wire client'),
-                        }
-                    ]))
-
-            renders.append(
                 FileRender('api_cpp_print.h',
                            'include/dawn/' + api + '_cpp_print.h', [
                                RENDER_PARAMS_BASE, params_dawn, {
@@ -1052,16 +892,6 @@ class MultiGeneratorFromDawnJSON(Generator):
                                    'c_namespace': None,
                                }
                            ]))
-
-            renders.append(
-                FileRender(
-                    'api_cpp_print.h',
-                    'include/dawn/wire/client/' + api + '_cpp_print.h', [
-                        RENDER_PARAMS_BASE, params_dawn, {
-                            'cpp_header': 'dawn/wire/client/' + api + '_cpp.h',
-                            'c_namespace': Name('dawn wire client'),
-                        }
-                    ]))
 
             renders.append(
                 FileRender('api_cpp_chained_struct.h',
@@ -1250,110 +1080,6 @@ class MultiGeneratorFromDawnJSON(Generator):
                            'src/dawn/utils/ComboLimits.cpp',
                            [RENDER_PARAMS_BASE, params]))
 
-        if 'wire' in targets:
-            params_dawn_wire = parse_json(loaded_json,
-                                          enabled_tags=['dawn', 'deprecated'],
-                                          disabled_tags=['native'],
-                                          addins=wire_addins + extra_addins)
-            additional_params = compute_wire_params(params_dawn_wire,
-                                                    wire_json)
-
-            imported_templates += [
-                "dawn/api_structs.h.tmpl",
-                "dawn/api_structs.cpp.tmpl",
-                "dawn/cpp_macros.tmpl",
-                "dawn/dawn_platform.h.tmpl",
-            ]
-
-            wire_params = [
-                RENDER_PARAMS_BASE, params_dawn_wire, {
-                    'as_wireType': lambda type : as_wireType(metadata, type),
-                    'as_annotated_wireType': \
-                        lambda arg: annotate(as_wireType(metadata, arg.type), arg),
-                    'is_wire_serializable': lambda type : is_wire_serializable(type),
-                    'is_wire_data_only': \
-                        lambda member: member.type.name.get() in ['void', 'std::byte'] and \
-                                       not member.skip_serialize,
-                }, additional_params
-            ]
-            renders.append(
-                FileRender('dawn/wire/ObjectType.h',
-                           'src/dawn/wire/ObjectType_autogen.h', wire_params))
-            renders.append(
-                FileRender('dawn/wire/WireCmd.h',
-                           'src/dawn/wire/WireCmd_autogen.h', wire_params))
-            renders.append(
-                FileRender('dawn/wire/WireCmd.cpp',
-                           'src/dawn/wire/WireCmd_autogen.cpp', wire_params))
-            renders.append(
-                FileRender(
-                    'dawn/wire/api_structs.h', 'src/dawn/wire/' +
-                    metadata.namespace + '_structs_autogen.h', wire_params))
-            renders.append(
-                FileRender(
-                    'dawn/wire/api_structs.cpp', 'src/dawn/wire/' +
-                    metadata.namespace + '_structs_autogen.cpp', wire_params))
-            renders.append(
-                FileRender('dawn/wire/dawn_platform.h',
-                           'src/dawn/wire/' + prefix + '_platform.h',
-                           wire_params))
-
-            renders.append(
-                FileRender('dawn/wire/client/ApiObjects.h',
-                           'src/dawn/wire/client/ApiObjects_autogen.h',
-                           wire_params))
-            renders.append(
-                FileRender('dawn/wire/client/ApiProcs.cpp',
-                           'src/dawn/wire/client/ApiProcs_autogen.cpp.inc',
-                           wire_params))
-            renders.append(
-                FileRender('dawn/wire/client/ClientBase.h',
-                           'src/dawn/wire/client/ClientBase_autogen.h',
-                           wire_params))
-            renders.append(
-                FileRender('dawn/wire/client/ClientHandlers.cpp',
-                           'src/dawn/wire/client/ClientHandlers_autogen.cpp',
-                           wire_params))
-            renders.append(
-                FileRender(
-                    'dawn/wire/client/ClientPrototypes.inc',
-                    'src/dawn/wire/client/ClientPrototypes_autogen.inc',
-                    wire_params))
-            renders.append(
-                FileRender(
-                    'dawn/wire/client/api_structs.h', 'src/dawn/wire/client/' +
-                    metadata.namespace + '_structs_autogen.h', wire_params))
-            renders.append(
-                FileRender(
-                    'dawn/wire/client/api_structs.cpp',
-                    'src/dawn/wire/client/' + metadata.namespace +
-                    '_structs_autogen.cpp', wire_params))
-            renders.append(
-                FileRender('dawn/wire/client/dawn_platform.h',
-                           'src/dawn/wire/client/' + prefix + '_platform.h',
-                           wire_params))
-            renders.append(
-                FileRender('dawn/wire/server/ServerBase.h',
-                           'src/dawn/wire/server/ServerBase_autogen.h',
-                           wire_params))
-            renders.append(
-                FileRender('dawn/wire/server/ServerDoers.cpp',
-                           'src/dawn/wire/server/ServerDoers_autogen.cpp',
-                           wire_params))
-            renders.append(
-                FileRender('dawn/wire/server/ServerHandlers.cpp',
-                           'src/dawn/wire/server/ServerHandlers_autogen.cpp',
-                           wire_params))
-            renders.append(
-                FileRender(
-                    'dawn/wire/server/ServerPrototypes.inc',
-                    'src/dawn/wire/server/ServerPrototypes_autogen.inc',
-                    wire_params))
-            renders.append(
-                FileRender('dawn/wire/server/WGPUTraits.h',
-                           'src/dawn/wire/server/WGPUTraits_autogen.h',
-                           wire_params))
-
         if 'kotlin' in targets:
             params_kotlin = compute_kotlin_params(loaded_json, kotlin_json,
                                                   kotlin_addins + extra_addins,
@@ -1467,8 +1193,6 @@ class MultiGeneratorFromDawnJSON(Generator):
     def get_dependencies(self, args):
         deps = [os.path.abspath(args.dawn_json)]
         deps += [os.path.abspath(p) for p in (args.addin_jsons or [])]
-        if args.wire_json != None:
-            deps += [os.path.abspath(args.wire_json)]
         if args.native_json != None:
             deps += [os.path.abspath(args.native_json)]
         if args.kotlin_json != None:

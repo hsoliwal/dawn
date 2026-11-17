@@ -69,7 +69,6 @@ class CaptureAndReplayTests : public DawnTest {
         // client device which cannot be cast to a native device, causing a crash.
         // TODO(crbug.com/452924800): Remove once these tests work properly with
         // the WebGPU on WebGPU backend with wire.
-        DAWN_SUPPRESS_TEST_IF(UsesWire());
     }
 
     class Recorder {

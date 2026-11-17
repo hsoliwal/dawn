@@ -81,19 +81,16 @@ dawn_add_library(
   UTILITY_TARGET dawn_internal_config
   PRIVATE_HEADERS
     "BinarySemaphore.h"
-    "TerribleCommandBuffer.h"
     "TestUtils.h"
     "WireHelper.h"
   SOURCES
     "BinarySemaphore.cpp"
-    "TerribleCommandBuffer.cpp"
     "TestUtils.cpp"
     "WireHelper.cpp"
   DEPENDS
     dawn_wgpu_utils
     webgpu_cpp
     dawn::dawn_common
-    dawn::dawn_wire
     dawn::partition_alloc
     absl::flat_hash_set
 )

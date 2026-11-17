@@ -199,7 +199,6 @@ TEST_P(DestroyTest, DestroyDeviceBeforeSubmit) {
 
 TEST_P(DestroyTest, DestroyDeviceUnmapsBuffers) {
     // TODO(crbug.com/403313307): Need to fix wire client to unmap buffers on device destroy.
-    DAWN_TEST_UNSUPPORTED_IF(UsesWire());
 
     wgpu::BufferDescriptor desc{.size = 8};
 

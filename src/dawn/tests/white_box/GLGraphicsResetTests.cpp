@@ -45,7 +45,6 @@ class GLGraphicsResetTests : public DawnTest {
   protected:
     void SetUp() override {
         DawnTest::SetUp();
-        DAWN_TEST_UNSUPPORTED_IF(UsesWire());
         DAWN_TEST_UNSUPPORTED_IF(HasToggleEnabled("disable_robustness"));
         // GL errors abort in the debug output callback when backend validation is enabled.
         DAWN_TEST_UNSUPPORTED_IF(IsBackendValidationEnabled());

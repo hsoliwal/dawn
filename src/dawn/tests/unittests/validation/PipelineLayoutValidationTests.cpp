@@ -246,9 +246,6 @@ TEST_F(PipelineLayoutValidationTest, MaxBindGroups) {
 // Test that bindGroupLayoutCount is checked before dereferencing bindGroupLayouts.
 TEST_F(PipelineLayoutValidationTest, BGLCountOverLimitsNotAccessed) {
     // This is a test for dawn::native only.
-    if (UsesWire()) {
-        GTEST_SKIP();
-    }
 
     // Check that bindGroupLayouts is not accessed if their count is higher that the bind group
     // limit.

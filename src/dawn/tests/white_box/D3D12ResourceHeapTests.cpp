@@ -38,7 +38,6 @@ class D3D12ResourceHeapTests : public DawnTest {
   protected:
     void SetUp() override {
         DawnTest::SetUp();
-        DAWN_TEST_UNSUPPORTED_IF(UsesWire());
     }
 
     std::vector<wgpu::FeatureName> GetRequiredFeatures() override {

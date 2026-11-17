@@ -5059,7 +5059,6 @@ class BlitTextureToBufferTest : public DawnTest {};
 // Test that encoding a CopyTextureToBuffer but not submitting it doesn't mark the buffer as
 // initialized.
 TEST_P(BlitTextureToBufferTest, NoSubmitDoesNotMarkInitialized) {
-    DAWN_TEST_UNSUPPORTED_IF(UsesWire());
 
     // Create a buffer that we will use as the destination of a CopyTextureToBuffer.
     wgpu::BufferDescriptor bufferDesc;

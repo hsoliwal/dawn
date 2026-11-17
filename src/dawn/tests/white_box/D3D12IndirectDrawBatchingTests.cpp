@@ -40,7 +40,6 @@ class D3D12IndirectDrawBatchingTests : public DawnTest {
   protected:
     void SetUp() override {
         DawnTest::SetUp();
-        DAWN_TEST_UNSUPPORTED_IF(UsesWire());
         mRenderPass = utils::CreateBasicRenderPass(device, 4, 4);
         auto shader = utils::CreateShaderModule(device, R"(
             @vertex fn vs(@location(0) pos: vec4f) -> @builtin(position) vec4f {

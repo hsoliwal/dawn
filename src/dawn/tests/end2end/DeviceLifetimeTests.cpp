@@ -250,9 +250,7 @@ TEST_P(DeviceLifetimeTests, DroppedInsideBufferMapCallback) {
                         // TODO(crbug.com/dawn/1424): On the wire client, we don't track device
                         // child objects so the mapped data is still available when the device is
                         // destroyed.
-                        if (!UsesWire()) {
-                            EXPECT_EQ(buffer.GetConstMappedRange(), nullptr);
-                        }
+                        EXPECT_EQ(buffer.GetConstMappedRange(), nullptr);
                     });
 
     WaitForAllOperations();
@@ -260,9 +258,7 @@ TEST_P(DeviceLifetimeTests, DroppedInsideBufferMapCallback) {
     // Mapped data should be null since the buffer is implicitly destroyed.
     // TODO(crbug.com/dawn/1424): On the wire client, we don't track device child objects so the
     // mapped data is still available when the device is destroyed.
-    if (!UsesWire()) {
-        EXPECT_EQ(buffer.GetConstMappedRange(), nullptr);
-    }
+    EXPECT_EQ(buffer.GetConstMappedRange(), nullptr);
 }
 
 // Test that the device can be dropped while a write buffer operation is enqueued.
@@ -301,7 +297,7 @@ TEST_P(DeviceLifetimeTests, DroppedWhileCreatePipelineAsync) {
 
     device.CreateComputePipelineAsync(
         &desc,
-        UsesWire() ? wgpu::CallbackMode::AllowSpontaneous : wgpu::CallbackMode::AllowProcessEvents,
+        wgpu::CallbackMode::AllowProcessEvents,
         [](wgpu::CreatePipelineAsyncStatus status, wgpu::ComputePipeline pipeline,
            wgpu::StringView) {
             EXPECT_EQ(wgpu::CreatePipelineAsyncStatus::Success, status);
@@ -397,7 +393,7 @@ TEST_P(DeviceLifetimeTests, DroppedWhileCreatePipelineAsyncRaceCache) {
 
     device.CreateComputePipelineAsync(
         &desc,
-        UsesWire() ? wgpu::CallbackMode::AllowSpontaneous : wgpu::CallbackMode::AllowProcessEvents,
+        wgpu::CallbackMode::AllowProcessEvents,
         [](wgpu::CreatePipelineAsyncStatus status, wgpu::ComputePipeline pipeline,
            wgpu::StringView) {
             EXPECT_EQ(wgpu::CreatePipelineAsyncStatus::Success, status);

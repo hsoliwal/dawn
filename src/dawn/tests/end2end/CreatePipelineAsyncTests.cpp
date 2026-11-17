@@ -170,7 +170,6 @@ TEST_P(CreatePipelineAsyncTest, BasicUseOfCreateComputePipelineAsync) {
 
 // Stress test that asynchronously creates many compute pipelines.
 TEST_P(CreatePipelineAsyncTest, CreateComputePipelineAsyncStress) {
-    DAWN_TEST_UNSUPPORTED_IF(UsesWire());
 
     // TODO(crbug.com/dawn/1766): TSAN reported race conditions in NVIDIA's vk driver.
     DAWN_SUPPRESS_TEST_IF(IsVulkan() && IsNvidia() && IsTsan());
@@ -203,7 +202,6 @@ TEST_P(CreatePipelineAsyncTest, CreateComputePipelineAsyncStress) {
 
 // Stress test that asynchronously creates many compute pipelines in different threads.
 TEST_P(CreatePipelineAsyncTest, CreateComputePipelineAsyncStressManyThreads) {
-    DAWN_TEST_UNSUPPORTED_IF(UsesWire());
     // TODO(crbug.com/42240635): eglMakeCurrent: Context can only be current on one thread
     DAWN_TEST_UNSUPPORTED_IF(IsOpenGL() || IsOpenGLES());
 
@@ -340,7 +338,6 @@ TEST_P(CreatePipelineAsyncTest, BasicUseOfCreateRenderPipelineAsync) {
 
 // Stress test that asynchronously creates many render pipelines.
 TEST_P(CreatePipelineAsyncTest, CreateRenderPipelineAsyncStress) {
-    DAWN_TEST_UNSUPPORTED_IF(UsesWire());
 
     // TODO(crbug.com/dawn/1766): TSAN reported race conditions in NVIDIA's vk driver.
     DAWN_SUPPRESS_TEST_IF(IsVulkan() && IsNvidia() && IsTsan());
@@ -375,7 +372,6 @@ TEST_P(CreatePipelineAsyncTest, CreateRenderPipelineAsyncStress) {
 
 // Stress test that asynchronously creates many render pipelines in different threads.
 TEST_P(CreatePipelineAsyncTest, CreateRenderPipelineAsyncStressManyThreads) {
-    DAWN_TEST_UNSUPPORTED_IF(UsesWire());
     // TODO(crbug.com/42240635): eglMakeCurrent: Context can only be current on one thread
     DAWN_TEST_UNSUPPORTED_IF(IsOpenGL() || IsOpenGLES());
 
@@ -746,9 +742,7 @@ TEST_P(CreatePipelineAsyncTest, CreateSameComputePipelineTwiceAtSameTime) {
 
     // Verify task.computePipeline and anotherTask.computePipeline are pointing to the same Dawn
     // object.
-    if (!UsesWire()) {
-        EXPECT_EQ(task.computePipeline.Get(), anotherTask.computePipeline.Get());
-    }
+    EXPECT_EQ(task.computePipeline.Get(), anotherTask.computePipeline.Get());
 }
 
 // Verify the basic use of CreateRenderPipelineAsync() works on all backends.
@@ -797,9 +791,7 @@ TEST_P(CreatePipelineAsyncTest, CreateSameRenderPipelineTwiceAtSameTime) {
 
     // Verify task.renderPipeline and anotherTask.renderPipeline are pointing to the same Dawn
     // object.
-    if (!UsesWire()) {
-        EXPECT_EQ(task.renderPipeline.Get(), anotherTask.renderPipeline.Get());
-    }
+    EXPECT_EQ(task.renderPipeline.Get(), anotherTask.renderPipeline.Get());
 }
 
 // Verify calling CreateRenderPipelineAsync() with valid VertexBufferLayouts works on all backends.

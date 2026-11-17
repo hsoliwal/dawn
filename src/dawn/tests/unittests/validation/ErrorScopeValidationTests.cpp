@@ -46,8 +46,7 @@ using utils::BinarySemaphore;
 
 class ErrorScopeValidationTest : public ValidationTest {
   protected:
-    void FlushWireAndProcessEvents() {
-        FlushWire();
+    void ProcessInstanceEvents() {
         instance.ProcessEvents();
     }
 
@@ -63,7 +62,7 @@ TEST_F(ErrorScopeValidationTest, Success) {
                 Call(wgpu::PopErrorScopeStatus::Success, wgpu::ErrorType::NoError, _))
         .Times(1);
     device.PopErrorScope(wgpu::CallbackMode::AllowProcessEvents, mPopErrorScopeCb.Callback());
-    FlushWireAndProcessEvents();
+    ProcessInstanceEvents();
 }
 
 // Test the simple case where the error scope catches an error.
@@ -78,7 +77,7 @@ TEST_F(ErrorScopeValidationTest, CatchesError) {
                 Call(wgpu::PopErrorScopeStatus::Success, wgpu::ErrorType::Validation, _))
         .Times(1);
     device.PopErrorScope(wgpu::CallbackMode::AllowProcessEvents, mPopErrorScopeCb.Callback());
-    FlushWireAndProcessEvents();
+    ProcessInstanceEvents();
 }
 
 // Test that errors bubble to the parent scope if not handled by the current scope.
@@ -95,14 +94,14 @@ TEST_F(ErrorScopeValidationTest, ErrorBubbles) {
                 Call(wgpu::PopErrorScopeStatus::Success, wgpu::ErrorType::NoError, _))
         .Times(1);
     device.PopErrorScope(wgpu::CallbackMode::AllowProcessEvents, mPopErrorScopeCb.Callback());
-    FlushWireAndProcessEvents();
+    ProcessInstanceEvents();
 
     // Parent validation error scope captures the error.
     EXPECT_CALL(mPopErrorScopeCb,
                 Call(wgpu::PopErrorScopeStatus::Success, wgpu::ErrorType::Validation, _))
         .Times(1);
     device.PopErrorScope(wgpu::CallbackMode::AllowProcessEvents, mPopErrorScopeCb.Callback());
-    FlushWireAndProcessEvents();
+    ProcessInstanceEvents();
 }
 
 // Test that if an error scope matches an error, it does not bubble to the parent scope.
@@ -119,14 +118,14 @@ TEST_F(ErrorScopeValidationTest, HandledErrorsStopBubbling) {
                 Call(wgpu::PopErrorScopeStatus::Success, wgpu::ErrorType::Validation, _))
         .Times(1);
     device.PopErrorScope(wgpu::CallbackMode::AllowProcessEvents, mPopErrorScopeCb.Callback());
-    FlushWireAndProcessEvents();
+    ProcessInstanceEvents();
 
     // Parent scope does not see the error.
     EXPECT_CALL(mPopErrorScopeCb,
                 Call(wgpu::PopErrorScopeStatus::Success, wgpu::ErrorType::NoError, _))
         .Times(1);
     device.PopErrorScope(wgpu::CallbackMode::AllowProcessEvents, mPopErrorScopeCb.Callback());
-    FlushWireAndProcessEvents();
+    ProcessInstanceEvents();
 }
 
 // Test that if no error scope handles an error, it goes to the device UncapturedError callback
@@ -141,13 +140,12 @@ TEST_F(ErrorScopeValidationTest, UnhandledErrorsMatchUncapturedErrorCallback) {
                 Call(wgpu::PopErrorScopeStatus::Success, wgpu::ErrorType::NoError, _))
         .Times(1);
     device.PopErrorScope(wgpu::CallbackMode::AllowProcessEvents, mPopErrorScopeCb.Callback());
-    FlushWireAndProcessEvents();
+    ProcessInstanceEvents();
 }
 
 // Test that an error that happens in another thread is NOT caught.
 TEST_F(ErrorScopeValidationTest, ThreadLocalError) {
     // Thread local error scope is only implemented on native.
-    DAWN_SKIP_TEST_IF(UsesWire());
 
     // ThreadA pushes the scope, yields to ThreadB to cause an error, and then tries to pop the
     // scope.
@@ -178,7 +176,6 @@ TEST_F(ErrorScopeValidationTest, ThreadLocalError) {
 // Test that an error that happens in a thread is only caught by that thread.
 TEST_F(ErrorScopeValidationTest, ThreadLocalErrorOnlyOneThread) {
     // Thread local error scope is only implemented on native.
-    DAWN_SKIP_TEST_IF(UsesWire());
 
     // ThreadA pushes the scope, yields to ThreadB to push scope, then error happens on ThreadA. We
     // first pop from ThreadB which should not see an error, then pop from ThreadA which should see
@@ -229,7 +226,7 @@ TEST_F(ErrorScopeValidationTest, PushPopBalanced) {
                          SizedStringMatches(HasSubstr("No error scopes"))))
             .Times(1);
         device.PopErrorScope(wgpu::CallbackMode::AllowProcessEvents, mPopErrorScopeCb.Callback());
-        FlushWireAndProcessEvents();
+        ProcessInstanceEvents();
     }
     // Too many pops
     {
@@ -239,14 +236,14 @@ TEST_F(ErrorScopeValidationTest, PushPopBalanced) {
                     Call(wgpu::PopErrorScopeStatus::Success, wgpu::ErrorType::NoError, _))
             .Times(1);
         device.PopErrorScope(wgpu::CallbackMode::AllowProcessEvents, mPopErrorScopeCb.Callback());
-        FlushWireAndProcessEvents();
+        ProcessInstanceEvents();
 
         EXPECT_CALL(mPopErrorScopeCb,
                     Call(wgpu::PopErrorScopeStatus::Error, wgpu::ErrorType::NoError,
                          SizedStringMatches(HasSubstr("No error scopes"))))
             .Times(1);
         device.PopErrorScope(wgpu::CallbackMode::AllowProcessEvents, mPopErrorScopeCb.Callback());
-        FlushWireAndProcessEvents();
+        ProcessInstanceEvents();
     }
 }
 
@@ -266,7 +263,7 @@ TEST_F(ErrorScopeValidationTest, DeviceDestroyedBeforeCallback) {
     ExpectDeviceDestruction();
     device = nullptr;
 
-    FlushWireAndProcessEvents();
+    ProcessInstanceEvents();
 }
 
 // If the device is destroyed, pop error scope should callback with NoError.
@@ -274,13 +271,13 @@ TEST_F(ErrorScopeValidationTest, DeviceDestroyedBeforePop) {
     device.PushErrorScope(wgpu::ErrorFilter::Validation);
     ExpectDeviceDestruction();
     device.Destroy();
-    FlushWireAndProcessEvents();
+    ProcessInstanceEvents();
 
     EXPECT_CALL(mPopErrorScopeCb, Call(wgpu::PopErrorScopeStatus::Success, wgpu::ErrorType::NoError,
                                        EmptySizedString()))
         .Times(1);
     device.PopErrorScope(wgpu::CallbackMode::AllowProcessEvents, mPopErrorScopeCb.Callback());
-    FlushWireAndProcessEvents();
+    ProcessInstanceEvents();
 }
 
 // Regression test that on device shutdown, we don't get a recursion in O(pushed error scope) that

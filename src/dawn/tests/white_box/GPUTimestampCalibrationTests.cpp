@@ -106,7 +106,6 @@ class GPUTimestampCalibrationTests : public DawnTestWithParams<GPUTimestampCalib
     void SetUp() override {
         DawnTestWithParams<GPUTimestampCalibrationTestParams>::SetUp();
 
-        DAWN_TEST_UNSUPPORTED_IF(UsesWire());
         // Requires that timestamp query feature is enabled and timestamp query conversion is
         // disabled.
         DAWN_TEST_UNSUPPORTED_IF(!mIsFeatureSupported);

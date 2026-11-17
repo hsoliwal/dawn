@@ -117,7 +117,6 @@ SharedTextureMemoryTestVulkanBackend::ChainBeginState(
 }
 
 void SharedTextureMemoryNoFeatureTests::SetUp() {
-    DAWN_TEST_UNSUPPORTED_IF(UsesWire());
     DawnTestWithParams<SharedTextureMemoryTestParams>::SetUp();
     // TODO(crbug.com/483147423): Implement Capture.
     DAWN_SUPPRESS_TEST_IF(IsCaptureReplayCheckingEnabled());
@@ -149,7 +148,6 @@ std::vector<wgpu::FeatureName> SharedTextureMemoryTests::GetRequiredFeatures() {
 }
 
 void SharedTextureMemoryTests::SetUp() {
-    DAWN_TEST_UNSUPPORTED_IF(UsesWire());
     DawnTestWithParams<SharedTextureMemoryTestParams>::SetUp();
     DAWN_TEST_UNSUPPORTED_IF(
         !SupportsFeatures(GetParam().mBackend->RequiredFeatures(GetAdapter().Get())));
@@ -3771,7 +3769,6 @@ class SharedTextureMemoryVulkanTests : public DawnTest {};
 
 // Test that only a single Vulkan fence feature may be enabled at once.
 TEST_P(SharedTextureMemoryVulkanTests, SingleFenceFeature) {
-    DAWN_TEST_UNSUPPORTED_IF(UsesWire());
 
     std::vector<wgpu::FeatureName> fenceFeatures;
 

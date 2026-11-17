@@ -161,7 +161,6 @@ add_subdirectory(utils)
 # Only build the rest of Dawn when Emscripten is not the target environment.
 if (NOT EMSCRIPTEN)
   add_subdirectory(platform)
-  add_subdirectory(wire)
   add_subdirectory(native)
   add_subdirectory(replay)
 endif()

@@ -4,6 +4,11 @@ on:
   # Only run on demand and when publishing a nightly release. (We don't rely on
   # GitHub Actions to test PRs, because that all happens in Gerrit.)
   workflow_dispatch:
+    inputs:
+      build_tests:
+        description: Also build Dawn's tests, and run dawn_unittests (no GPU) on Linux
+        type: boolean
+        default: false
   workflow_call:
 
 permissions:
@@ -138,9 +143,18 @@ jobs:
           -DCMAKE_CXX_COMPILER=${{ matrix.cpp_compiler }}
           -DCMAKE_C_COMPILER=${{ matrix.c_compiler }}
           -DCMAKE_BUILD_TYPE=${{ matrix.build_type }}
+          -DDAWN_BUILD_TESTS=${{ inputs.build_tests && 'ON' || 'OFF' }}
 
       - name: Build
         run: cmake --build out/${{ matrix.build_type }} --config ${{ matrix.build_type }}
+
+      - name: Run unit tests (no GPU)
+        if: ${{ inputs.build_tests && matrix.os == 'ubuntu-latest' }}
+        run: |
+          set -euo pipefail
+          bin=$(find out/${{ matrix.build_type }} -type f -name dawn_unittests | head -1)
+          test -n "$bin"
+          "$bin" --gtest_brief=1
 
       - name: Package
         run: |

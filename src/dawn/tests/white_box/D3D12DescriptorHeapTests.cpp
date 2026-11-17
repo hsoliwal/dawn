@@ -59,7 +59,6 @@ class D3D12DescriptorHeapTests : public DawnTest {
 
         // Tests reach directly in d3d12::Device and friends so skip them on wire and with implicit
         // device sync.
-        DAWN_TEST_UNSUPPORTED_IF(UsesWire());
         DAWN_TEST_UNSUPPORTED_IF(IsImplicitDeviceSyncEnabled());
 
         mD3DDevice = ToBackend(FromAPI(device.Get()));

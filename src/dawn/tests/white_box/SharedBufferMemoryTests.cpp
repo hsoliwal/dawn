@@ -40,7 +40,6 @@
 namespace dawn {
 
 void SharedBufferMemoryTests::SetUp() {
-    DAWN_TEST_UNSUPPORTED_IF(UsesWire());
     DawnTestWithParams<SharedBufferMemoryTestParams>::SetUp();
     DAWN_TEST_UNSUPPORTED_IF(!SupportsBackend());
 }
@@ -1069,18 +1068,17 @@ TEST_P(SharedBufferMemoryTests, CreateBufferFakeOOM) {
     Check(false, false, &descriptor);
 
     // SharedBufferMemoryTests won't be run with wire.
-    constexpr bool kUsesWire = false;
 
     // Test OOM in Dawn Native.
     oomForTesting = {};
     oomForTesting.fakeOOMAtNativeMap = true;
-    Check(!kUsesWire, false, &descriptor);
+    Check(true, false, &descriptor);
 
     // Test OOM in Dawn Native AND in the device allocation. Similar to previous case.
     oomForTesting = {};
     oomForTesting.fakeOOMAtNativeMap = true;
     oomForTesting.fakeOOMAtDevice = true;
-    Check(!kUsesWire, false, &descriptor);
+    Check(true, false, &descriptor);
 
     // Test OOM only in device allocation. There should be no nulls returned at either layer.
     oomForTesting = {};

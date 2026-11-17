@@ -63,9 +63,6 @@ using ::testing::Matcher;
 using ::testing::SizedStringMatches;
 using ::testing::UnitTest;
 
-bool gUseWire = false;
-// NOLINTNEXTLINE(runtime/string)
-std::string gWireTraceDir = "";
 std::unique_ptr<ToggleParser> gToggleParser = nullptr;
 static ValidationTest* gCurrentTest = nullptr;
 
@@ -79,18 +76,6 @@ void InitDawnValidationTestEnvironment(int argc, char** argv) {
     gToggleParser = std::make_unique<ToggleParser>();
 
     for (int i = 1; i < argc; ++i) {
-        if (strcmp("-w", argv[i]) == 0 || strcmp("--use-wire", argv[i]) == 0) {
-            gUseWire = true;
-            continue;
-        }
-
-        constexpr const char kWireTraceDirArg[] = "--wire-trace-dir=";
-        size_t argLen = sizeof(kWireTraceDirArg) - 1;
-        if (strncmp(argv[i], kWireTraceDirArg, argLen) == 0) {
-            gWireTraceDir = argv[i] + argLen;
-            continue;
-        }
-
         if (gToggleParser->ParseEnabledToggles(argv[i])) {
             continue;
         }
@@ -102,9 +87,8 @@ void InitDawnValidationTestEnvironment(int argc, char** argv) {
         if (strcmp("-h", argv[i]) == 0 || strcmp("--help", argv[i]) == 0) {
             dawn::InfoLog()
                 << "\n\nUsage: " << argv[0]
-                << " [GTEST_FLAGS...] [-w]\n"
+                << " [GTEST_FLAGS...]\n"
                    "    [--enable-toggles=toggles] [--disable-toggles=toggles]\n"
-                   "  -w, --use-wire: Run the tests through the wire (defaults to no wire)\n"
                    "  --enable-toggles: Comma-delimited list of Dawn toggles to enable.\n"
                    "    ex.) skip_validation,disable_robustness,turn_off_vsync\n"
                    "  --disable-toggles: Comma-delimited list of Dawn toggles to disable\n";
@@ -197,7 +181,7 @@ ValidationTest::ValidationTest() {
              new WGPURequestDeviceCallbackInfo(callbackInfo), nullptr});
     };
 
-    mWireHelper = dawn::utils::CreateWireHelper(procs, gUseWire, gWireTraceDir.c_str());
+    mWireHelper = dawn::utils::CreateWireHelper(procs);
 }
 
 void ValidationTest::SetUp() {
@@ -258,7 +242,6 @@ ValidationTest::~ValidationTest() {
 }
 
 void ValidationTest::TearDown() {
-    FlushWire();
     ASSERT_FALSE(mExpectError);
 
     // Note that if the test is skipped before SetUp is called, mDawnInstance will not get set and
@@ -308,14 +291,6 @@ void ValidationTest::EndExpectNoDeviceLog() {
 
 void ValidationTest::ExpectDeviceDestruction() {
     mExpectDestruction = true;
-}
-
-bool ValidationTest::UsesWire() const {
-    return gUseWire;
-}
-
-void ValidationTest::FlushWire() {
-    EXPECT_TRUE(mWireHelper->FlushClient());
 }
 
 void ValidationTest::WaitForAllOperations() {
@@ -385,7 +360,6 @@ wgpu::Device ValidationTest::RequestDeviceSync(const wgpu::DeviceDescriptor& dev
                               }
                               apiDevice = std::move(result);
                           });
-    FlushWire();
     DAWN_ASSERT(apiDevice);
     return apiDevice;
 }
@@ -394,15 +368,9 @@ dawn::native::Adapter& ValidationTest::GetBackendAdapter() {
     return mBackendAdapter;
 }
 
-void ValidationTest::SetUp(const wgpu::InstanceDescriptor* nativeDesc,
-                           const wgpu::InstanceDescriptor* wireDesc) {
-    std::string traceName =
-        std::string(UnitTest::GetInstance()->current_test_info()->test_suite_name()) + "_" +
-        UnitTest::GetInstance()->current_test_info()->name();
-    mWireHelper->BeginWireTrace(traceName.c_str());
-
+void ValidationTest::SetUp(const wgpu::InstanceDescriptor* nativeDesc) {
     // Initialize the instances.
-    std::tie(instance, mDawnInstance) = mWireHelper->CreateInstances(nativeDesc, wireDesc);
+    std::tie(instance, mDawnInstance) = mWireHelper->CreateInstances(nativeDesc);
 
     // Initialize the adapter.
     wgpu::RequestAdapterOptions options = {};
@@ -413,7 +381,6 @@ void ValidationTest::SetUp(const wgpu::InstanceDescriptor* nativeDesc,
                             [this](wgpu::RequestAdapterStatus, wgpu::Adapter result,
                                    wgpu::StringView) -> void { adapter = std::move(result); });
 
-    FlushWire();
     DAWN_ASSERT(adapter);
 
     // Initialize the device.

@@ -30,11 +30,9 @@
 #include <vector>
 
 #include "dawn/dawn_proc.h"
-#include "dawn/wire/WireClient.h"
 #include "gtest/gtest.h"
 #include "src/dawn/native/Instance.h"
 #include "src/dawn/native/null/DeviceNull.h"
-#include "src/dawn/utils/TerribleCommandBuffer.h"
 
 namespace dawn {
 namespace {
@@ -43,22 +41,15 @@ using ::testing::PrintToStringParamName;
 using ::testing::TestWithParam;
 using ::testing::Values;
 
-// dawn_wire and dawn_native contain duplicated code for the handling of GetProcAddress
-// so we run the tests against both implementations. This enum is used as a test parameters to
-// know which implementation to test.
+// The implementation whose GetProcAddress is tested (dawn_native; dawn_wire was removed).
 enum class DawnFlavor {
     Native,
-    Wire,
 };
 
 std::ostream& operator<<(std::ostream& stream, DawnFlavor flavor) {
     switch (flavor) {
         case DawnFlavor::Native:
             stream << "dawn_native";
-            break;
-
-        case DawnFlavor::Wire:
-            stream << "dawn_wire";
             break;
 
         default:
@@ -88,22 +79,6 @@ class GetProcAddressTests : public TestWithParam<DawnFlavor> {
                 break;
             }
 
-            case DawnFlavor::Wire: {
-                mC2sBuf = std::make_unique<utils::TerribleCommandBuffer>();
-
-                wire::WireClientDescriptor clientDesc = {};
-                clientDesc.serializer = mC2sBuf.get();
-                mWireClient = std::make_unique<wire::WireClient>(clientDesc);
-
-                // Note that currently we are passing a null device since we do not actually use the
-                // device in determining the resulting proc addresses. If/when we actually care
-                // about features on the device to determine a proc address, this should be updated
-                // accordingly.
-                mDevice = nullptr;
-                mProcs = wire::client::GetProcs();
-                mC2sBuf->SetHandler(mWireClient.get());
-                break;
-            }
 
             default:
                 DAWN_UNREACHABLE();
@@ -114,19 +89,13 @@ class GetProcAddressTests : public TestWithParam<DawnFlavor> {
     }
 
     void TearDown() override {
-        // Destroy the device before freeing the instance or the wire client in the destructor
+        // Destroy the device before freeing the instance in the destructor
         mDevice = wgpu::Device();
-        if (mC2sBuf != nullptr) {
-            mC2sBuf->SetHandler(nullptr);
-        }
     }
 
   protected:
     Ref<native::InstanceBase> mNativeInstance;
     native::AdapterBase mAdapterBase;
-
-    std::unique_ptr<utils::TerribleCommandBuffer> mC2sBuf;
-    std::unique_ptr<wire::WireClient> mWireClient;
 
     wgpu::Device mDevice;
     DawnProcTable mProcs;
@@ -174,7 +143,7 @@ TEST_P(GetProcAddressTests, FreeStandingFunctions) {
 
 INSTANTIATE_TEST_SUITE_P(,
                          GetProcAddressTests,
-                         Values(DawnFlavor::Native, DawnFlavor::Wire),
+                         Values(DawnFlavor::Native),
                          PrintToStringParamName());
 
 }  // anonymous namespace

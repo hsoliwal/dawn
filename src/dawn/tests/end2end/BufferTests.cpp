@@ -67,8 +67,6 @@ class BufferMappingTests : public DawnTestWithParams<BufferMappingTestParams> {
     void SetUp() override {
         DawnTestWithParams<BufferMappingTestParams>::SetUp();
         // Wire only supports polling / spontaneous futures.
-        DAWN_TEST_UNSUPPORTED_IF(UsesWire() &&
-                                 GetParam().mFutureCallbackMode == wgpu::CallbackMode::WaitAnyOnly);
     }
 
     std::vector<wgpu::FeatureName> GetRequiredFeatures() override {
@@ -586,15 +584,9 @@ TEST_P(BufferMappingTests, OffsetNotUpdatedOnError) {
     wgpu::FutureWaitInfo f2;
     // TODO(crbug.com/42241221): Inject a validation error from the wire client, so that behavior
     // is consistent between native and wire.
-    if (!UsesWire()) {
-        ASSERT_DEVICE_ERROR(
-            f2 = {buffer.MapAsync(wgpu::MapMode::Read, 0, 4, GetParam().mFutureCallbackMode,
-                                  mMockCb.Callback())});
-    } else {
+    ASSERT_DEVICE_ERROR(
         f2 = {buffer.MapAsync(wgpu::MapMode::Read, 0, 4, GetParam().mFutureCallbackMode,
-                              mMockCb.Callback())};
-    }
-
+                              mMockCb.Callback())});
     switch (GetParam().mFutureCallbackMode) {
         case wgpu::CallbackMode::WaitAnyOnly: {
             ASSERT_EQ(GetInstance().WaitAny(1, &f1, UINT64_MAX), wgpu::WaitStatus::Success);
@@ -690,7 +682,6 @@ TEST_P(BufferMappingTests, RegressChromium1421170) {
 // waiting for OnSubmittedWorkDone, then mapping works correctly.
 TEST_P(BufferMappingTests, WaitForOnSubmittedWorkDoneThenMap) {
     // WaitAnyOnly is not supported in wire.
-    DAWN_TEST_UNSUPPORTED_IF(UsesWire());
     /// Fail on Xclipse with ANGLE Vulkan.
     DAWN_SUPPRESS_TEST_IF(IsSamsung() && IsOpenGLES() && IsANGLE());
 
@@ -778,7 +769,7 @@ TEST_P(BufferMappingTests, WaitForOnSubmittedWorkDoneThenMap) {
 DAWN_INSTANTIATE_TEST_P(BufferMappingTests,
                         {D3D11Backend(), D3D11Backend({"d3d11_disable_cpu_buffers"}),
                          D3D11Backend({"auto_map_backend_buffer", "d3d11_disable_cpu_buffers"}),
-                         D3D12Backend(), D3D12Backend().EnableSharedMemoryInWire(), MetalBackend(),
+                         D3D12Backend(), MetalBackend(),
                          OpenGLBackend(), OpenGLESBackend(), OpenGLESBackend({"gl_defer"}),
                          VulkanBackend(), WebGPUBackend()},
                         std::initializer_list<wgpu::CallbackMode>{
@@ -1229,7 +1220,6 @@ DAWN_INSTANTIATE_TEST(BufferMappedAtCreationTests,
                       D3D11Backend({"d3d11_disable_cpu_buffers"}),
                       D3D11Backend({"auto_map_backend_buffer", "d3d11_disable_cpu_buffers"}),
                       D3D12Backend(),
-                      D3D12Backend().EnableSharedMemoryInWire(),
                       D3D12Backend({}, {"use_d3d12_resource_heap_tier2"}),
                       MetalBackend(),
                       OpenGLBackend(),
@@ -1376,23 +1366,18 @@ TEST_P(BufferTests, BufferMappedAtCreationOOM_Simulated) {
         Check(false, false, &descriptor);
 
         // Test OOM in the wire client before ever sending a command.
-        if (UsesWire()) {
-            oomForTesting = {};
-            oomForTesting.fakeOOMAtWireClientMap = true;
-            Check(true, false, &descriptor);
-        }
 
         // Test OOM in Dawn Native. If using the wire, this could cause a
         // non-null client buffer to point to a null server buffer.
         oomForTesting = {};
         oomForTesting.fakeOOMAtNativeMap = true;
-        Check(!UsesWire(), false, &descriptor);
+        Check(true, false, &descriptor);
 
         // Test OOM in Dawn Native AND in the device allocation. Similar to previous case.
         oomForTesting = {};
         oomForTesting.fakeOOMAtNativeMap = true;
         oomForTesting.fakeOOMAtDevice = true;
-        Check(!UsesWire(), false, &descriptor);
+        Check(true, false, &descriptor);
 
         // Test OOM only in device allocation. There should be no nulls returned at either layer.
         oomForTesting = {};
@@ -1511,7 +1496,6 @@ TEST_P(BufferTests, CreateBufferOOMMapAsync) {
 DAWN_INSTANTIATE_TEST(BufferTests,
                       D3D11Backend(),
                       D3D12Backend(),
-                      D3D12Backend().EnableSharedMemoryInWire(),
                       MetalBackend(),
                       OpenGLBackend(),
                       OpenGLESBackend(),
@@ -1590,7 +1574,6 @@ class BufferMapExtendedUsagesTests : public DawnTestWithParams<BufferMapExtended
     void SetUp() override {
         DawnTestWithParams<BufferMapExtendedUsagesTestParams>::SetUp();
 
-        DAWN_TEST_UNSUPPORTED_IF(UsesWire());
         // Skip all tests if the required feature is not supported.
         DAWN_TEST_UNSUPPORTED_IF(!SupportsFeatures({RequiredFeature()}));
 
@@ -1600,7 +1583,7 @@ class BufferMapExtendedUsagesTests : public DawnTestWithParams<BufferMapExtended
 
     std::vector<wgpu::FeatureName> GetRequiredFeatures() override {
         std::vector<wgpu::FeatureName> requiredFeatures = {};
-        if (!UsesWire() && SupportsFeatures({RequiredFeature()})) {
+        if (SupportsFeatures({RequiredFeature()})) {
             requiredFeatures.push_back(RequiredFeature());
         }
         return requiredFeatures;

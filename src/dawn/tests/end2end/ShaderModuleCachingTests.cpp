@@ -94,7 +94,7 @@ TEST_P(ShaderModuleCachingTests, ShaderModuleFrontedCache) {
         mMockCache, Hit(0u), Add(0u),
         sameShaderModule = utils::CreateShaderModule(device, kComputeShaderDefault.data()));
 
-    EXPECT_EQ(shaderModule.Get() == sameShaderModule.Get(), !UsesWire());
+    EXPECT_EQ(shaderModule.Get(), sameShaderModule.Get());
 }
 
 // Tests that shader module creation hits the cache when it is enabled.

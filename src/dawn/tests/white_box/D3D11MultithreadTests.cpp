@@ -45,13 +45,9 @@ class D3D11MultithreadTests : public DawnTest {
   protected:
     void SetUp() override {
         DawnTest::SetUp();
-        DAWN_TEST_UNSUPPORTED_IF(UsesWire());
     }
 
     std::vector<wgpu::FeatureName> GetRequiredFeatures() override {
-        if (UsesWire()) {
-            return {};
-        }
         return {wgpu::FeatureName::D3D11MultithreadProtected,
                 wgpu::FeatureName::ImplicitDeviceSynchronization};
     }

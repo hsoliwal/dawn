@@ -30,7 +30,6 @@
 
 #include <webgpu/webgpu_cpp.h>
 
-#include <cstdint>
 #include <memory>
 #include <utility>
 
@@ -42,42 +41,27 @@ class Instance;
 
 namespace dawn::utils {
 
+// Sets the proc table the tests call through and creates or adopts their instances. Tests call
+// dawn::native directly: the wire client/server path was removed from this fork.
 class WireHelper {
   public:
-    virtual ~WireHelper();
+    explicit WireHelper(const DawnProcTable& procs);
+    ~WireHelper();
 
-    // Registers the instance on the wire, if present.
-    // Returns the wgpu::Instance which is the client instance on the wire (created with wireDesc),
-    // and the backend instance without the wire.
-    // The function should not take ownership of |backendInstance|.
-    virtual wgpu::Instance RegisterInstance(WGPUInstance backendInstance,
-                                            const WGPUInstanceDescriptor* wireDesc = nullptr) = 0;
+    wgpu::Instance RegisterInstance(WGPUInstance backendInstance);
 
-    // Helper to created a native instance and automatically register it with the wire if needed.
-    // Return the native instance and the same result as RegisterInstance.
+    // Create a native instance and the wgpu::Instance the test uses for it.
     std::pair<wgpu::Instance, std::unique_ptr<dawn::native::Instance>> CreateInstances(
-        const wgpu::InstanceDescriptor* nativeDesc = nullptr,
-        const wgpu::InstanceDescriptor* wireDesc = nullptr);
+        const wgpu::InstanceDescriptor* nativeDesc = nullptr);
 
-    // Helper that returns a handle to the native Device.
-    virtual WGPUDevice GetBackendDevice(const wgpu::Device& device) = 0;
+    WGPUDevice GetBackendDevice(const wgpu::Device& device);
 
-    virtual void BeginWireTrace(const char* name) = 0;
-
-    virtual bool FlushClient() = 0;
-    virtual bool FlushServer() = 0;
-
-    // Flushes the wire and all callbacks until idle.
+    // Process events until the native instance reports no more work.
     void WaitUntilIdle(dawn::native::Instance* serverInstance,
                        wgpu::Instance clientInstance = nullptr);
-
-    virtual bool IsIdle() = 0;
 };
 
-std::unique_ptr<WireHelper> CreateWireHelper(const DawnProcTable& procs,
-                                             bool useWire,
-                                             const char* wireTraceDir = nullptr,
-                                             bool enableSharedMemoryInWire = false);
+std::unique_ptr<WireHelper> CreateWireHelper(const DawnProcTable& procs);
 
 }  // namespace dawn::utils
 
