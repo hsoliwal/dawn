@@ -126,12 +126,7 @@ configuration for arm64-v8a, armeabi-v7a and x86.
 There is a substantial number of source files that are needed to be
 built for Dawn and its dependencies (~thousands), which can lead to
 long compile times on resource bound machines (i.e. laptops),
-especially when performing clean builds. The general advice for this
-situation is use the gn build with a remote compile system like siso,
-if available.
-
-An alternative if remote compilation isn't available, or if using
-CMake is essential for your workflow, is to use
+especially when performing clean builds. Use
 [ccache](https://ccache.dev/) to avoid rebuilding targets. For full
 details on using ccache see the project's documentation, but below is
 an example of how to use it on a Debian based Linux dev env.

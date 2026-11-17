@@ -1,8 +1,7 @@
 # Follow .clang-format for formatting
 FormatStyle: file
-# GN doesn't support -isystem so Clang-Tidy doesn't know which headers belong
-# to us when applying checks/fixes. Set that here.
-HeaderFilterRegex: '^(src|include|third_party/emdawnwebgpu)/.*)'
+# Limit checks and fixes to this fork's native headers.
+HeaderFilterRegex: '^(src|include)/.*'
 
 Checks:
   # List of checks: https://clang.llvm.org/extra/clang-tidy/checks/list.html

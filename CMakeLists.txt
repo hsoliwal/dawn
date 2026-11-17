@@ -63,8 +63,7 @@ set(DAWN_SRC_DIR "${Dawn_SOURCE_DIR}/src" CACHE PATH "Directory that contains so
 set(DAWN_INCLUDE_DIR "${Dawn_SOURCE_DIR}/include" CACHE PATH "Directory that contains public headers for dawn")
 set(DAWN_TEMPLATE_DIR "${DAWN_GENERATOR_DIR}/templates" CACHE PATH "Directory that contains templates for generators")
 
-# Emscripten.cmake toolchain sets this variable to `0`; otherwise, it's undefined, so set it to 1.
-set_if_not_defined(EMSCRIPTEN 0 "1 if building with Emscripten")
+# Reject browser toolchains before configuring native targets.
 if (EMSCRIPTEN)
   message(FATAL_ERROR "Browser builds (Emscripten, emdawnwebgpu) were removed from this fork; build Dawn natively.")
 endif()

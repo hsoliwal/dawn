@@ -36,7 +36,6 @@
 /third_party/glslang/src/
 /third_party/google_benchmark/src
 /third_party/googletest/src
-/third_party/gpuweb
 /third_party/highway/src
 /third_party/jdk/current
 /third_party/jinja2
@@ -55,9 +54,6 @@
 /third_party/mesa/src
 /third_party/nasm/src
 /third_party/ninja
-/third_party/node
-/third_party/node-addon-api
-/third_party/node-api-headers
 /third_party/partition_alloc
 /third_party/protobuf
 /third_party/simdutf/src
@@ -65,7 +61,6 @@
 /third_party/spirv-headers/src/
 /third_party/spirv-tools/src/
 /third_party/swiftshader
-/third_party/v8/src
 /third_party/vulkan-deps
 /third_party/vulkan-headers/src/
 /third_party/vulkan-loader/src/
@@ -73,7 +68,6 @@
 /third_party/vulkan-utility-libraries/src/
 /third_party/vulkan-validation-layers/src/
 /third_party/vulkan_memory_allocator
-/third_party/webgpu-cts
 /third_party/zlib
 /third_party/zstd
 /tools/bazelisk
@@ -160,8 +154,6 @@ $RECYCLE.BIN/
 ### Intellij ###
 .idea
 
-### Cached node transpiled tools
-/.node_transpile_work_dir
 
 # Misc inherited from Tint
 /test.wgsl
