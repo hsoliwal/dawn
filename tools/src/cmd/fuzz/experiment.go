@@ -420,7 +420,7 @@ func buildExperimentBinariesIfNeeded(t *taskConfig, settings ExperimentSettings)
 	}
 
 	fmt.Println("It looks like we are running a new experiment and need to build the fuzzers.")
-	fmt.Println("Building will checkout commit ", settings.Hash, " and run gclient sync.")
+	fmt.Println("Building will checkout commit ", settings.Hash, " and update the submodules.")
 	confirm, err := promptConfirm("Do you want to proceed with the build?")
 	if err != nil {
 		return "", fmt.Errorf("failed to read build confirmation: %w", err)

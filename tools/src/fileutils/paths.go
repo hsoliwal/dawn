@@ -58,7 +58,7 @@ func ThisDir() string {
 // DawnRoot returns the path to the dawn project's root directory or empty
 // string if not found.
 func DawnRoot(fsReader oswrapper.FilesystemReader) string {
-	return pathOfFileInParentDirs(ThisDir(), "DEPS", fsReader)
+	return pathOfFileInParentDirs(ThisDir(), "go.mod", fsReader)
 }
 
 // pathOfFileInParentDirs looks for file with `name` in paths starting from

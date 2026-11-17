@@ -257,7 +257,7 @@ func runBisect(t *taskConfig) error {
 	return nil
 }
 
-// testBisectStep runs gclient sync, builds t.fuzzer, and runs the test case, returning the outcome.
+// testBisectStep updates the submodules, builds t.fuzzer, and runs the test case, returning the outcome.
 func testBisectStep(t *taskConfig) (bisectStepResult, error) {
 	fuzzerName := filepath.Base(t.fuzzer)
 	if err := t.syncAndBuildTargets([]string{fuzzerName}); err != nil {
