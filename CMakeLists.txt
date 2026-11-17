@@ -89,14 +89,7 @@ set(BUILD_SAMPLES OFF)
 set(BUILD_TESTS OFF)
 set(TARGET_MACOS OFF)
 set(FORCE_SYSTEM_COMPONENT_LOAD OFF)
-if (EMSCRIPTEN)
-  # Only the samples are supported for Emscripten at the moment.
-  # TODO(crbug.com/42240181): Make dawn_end2end_tests work too.
-  set(BUILD_SAMPLES ON)
-  set(BUILD_TESTS ON)
-  set(ENABLE_NULL OFF)
-  set(ENABLE_WEBGPU_ON_WEBGPU OFF)
-elseif (WIN32)
+if (WIN32)
   set(ENABLE_D3D11 ON)
   set(USE_WINDOWS_UI ON)
   set(ENABLE_D3D12 ON)
@@ -122,14 +115,13 @@ elseif(UNIX)
 endif()
 
 # Not enabled for UWP because it only supports CoreWindow for windowing.
-# Not enabled for Emscripten because samples use Emscripten APIs, not GLFW.
 set(DAWN_SUPPORTS_GLFW_FOR_WINDOWING OFF)
-if ((WIN32 AND NOT WINDOWS_STORE) OR (UNIX AND NOT ANDROID AND NOT EMSCRIPTEN))
+if ((WIN32 AND NOT WINDOWS_STORE) OR (UNIX AND NOT ANDROID))
     set(DAWN_SUPPORTS_GLFW_FOR_WINDOWING ON)
 endif()
 
-# Samples require either GLFW or Emscripten for windowing.
-if (DAWN_SUPPORTS_GLFW_FOR_WINDOWING OR EMSCRIPTEN)
+# Samples require GLFW for windowing.
+if (DAWN_SUPPORTS_GLFW_FOR_WINDOWING)
     set(BUILD_SAMPLES ON)
 endif()
 
@@ -243,8 +235,8 @@ option(TINT_ENABLE_INSTALL "Enable install step for Tint libraries" OFF)
 option(TINT_BUILD_CMD_TOOLS "Build the Tint command line tools" ON)
 
 if (DAWN_BUILD_SAMPLES)
-  if (NOT DAWN_USE_GLFW AND NOT EMSCRIPTEN)
-    message(SEND_ERROR "Dawn samples require GLFW or Emscripten")
+  if (NOT DAWN_USE_GLFW)
+    message(SEND_ERROR "Dawn samples require GLFW")
   endif()
 endif()
 
@@ -274,13 +266,6 @@ if (TINT_BUILD_MESA AND DAWN_ENABLE_MSAN)
     message(FATAL_ERROR "Building Mesa with MSAN is not supported, due to pre-built dependencies not being instrumented for MSAN")
 endif()
 
-if (EMSCRIPTEN)
-  # Skip tint tests in emscripten build
-  set(TINT_BUILD_TESTS OFF)
-  # Skip GLSL validation in Emscripten
-  set(TINT_BUILD_GLSL_VALIDATOR OFF)
-endif()
-
 option(TINT_ENABLE_IR_DUMPING "Enable runtime control for dumping IR" ON)
 option(TINT_ENABLE_IR_VALIDATION_ASSERTS "Enable runtime control for IR validation assertions" ON)
 option(TINT_ENABLE_BREAK_IN_DEBUGGER "Enable tint::debugger::Break()" OFF)
@@ -294,7 +279,6 @@ message(STATUS "CMake generator......: ${CMAKE_GENERATOR}")
 message(STATUS "CMake version........: ${CMAKE_VERSION}")
 message(STATUS "")
 
-message(STATUS "Dawn building using Emscripten toolchain: ${EMSCRIPTEN}")
 message(STATUS "Dawn build D3D11 backend: ${DAWN_ENABLE_D3D11}")
 message(STATUS "Dawn build D3D12 backend: ${DAWN_ENABLE_D3D12}")
 message(STATUS "Dawn build Metal backend: ${DAWN_ENABLE_METAL}")
@@ -502,7 +486,6 @@ set(BUILD_SHARED_LIBS ${BUILD_SHARED_LIBS_SAVED})
 if (DAWN_ENABLE_D3D11 OR DAWN_ENABLE_D3D12 OR DAWN_ENABLE_METAL OR DAWN_ENABLE_NULL OR DAWN_ENABLE_DESKTOP_GL OR DAWN_ENABLE_OPENGLES OR DAWN_ENABLE_VULKAN)
     add_subdirectory(generator)
     add_subdirectory(src/dawn)
-    add_subdirectory(src/dawn/fuzzers)
 endif()
 
 ################################################################################

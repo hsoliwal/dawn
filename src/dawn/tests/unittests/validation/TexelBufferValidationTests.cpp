@@ -315,7 +315,6 @@ TEST_F(TexelBufferValidationTest, AdditionalChain) {
 class TexelBufferValidationWithExtendedMapTest : public TexelBufferValidationTest {
   protected:
     void SetUp() override {
-        DAWN_SKIP_TEST_IF(UsesWire());
         TexelBufferValidationTest::SetUp();
         DAWN_SKIP_TEST_IF(!adapter.HasFeature(wgpu::FeatureName::BufferMapExtendedUsages));
     }
@@ -351,16 +350,7 @@ class TexelBufferFeatureDisabledTest : public ValidationTest {
         wgpu::InstanceDescriptor nativeDesc;
         nativeDesc.nextInChain = &togglesDesc;
 
-        wgpu::DawnWireWGSLControl wgslControl;
-        wgslControl.nextInChain = &blocklist;
-        wgslControl.enableExperimental = false;
-        wgslControl.enableUnsafe = false;
-        wgslControl.enableTesting = true;
-
-        wgpu::InstanceDescriptor wireDesc;
-        wireDesc.nextInChain = &wgslControl;
-
-        ValidationTest::SetUp(&nativeDesc, &wireDesc);
+        ValidationTest::SetUp(&nativeDesc);
     }
 };
 

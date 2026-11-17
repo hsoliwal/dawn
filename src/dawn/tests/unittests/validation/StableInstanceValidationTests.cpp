@@ -77,7 +77,6 @@ class StableInstanceValidationTest : public ValidationTest {
     void SetUp() override {
         ValidationTest::SetUp();
         // The tests check dawn::native objects (toggles, feature info, error objects) directly.
-        DAWN_SKIP_TEST_IF(UsesWire());
 
         mStableProcs = GetStableProcs();
         ASSERT_NE(mStableProcs.createInstance, nullptr);

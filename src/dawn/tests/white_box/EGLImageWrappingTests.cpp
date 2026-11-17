@@ -156,7 +156,6 @@ class EGLImageTestBase : public DawnTest {
     }
 
     void SetUp() override {
-        DAWN_TEST_UNSUPPORTED_IF(UsesWire());
         DawnTest::SetUp();
 
         // Initialize EGL functions with runtime search paths from the instance

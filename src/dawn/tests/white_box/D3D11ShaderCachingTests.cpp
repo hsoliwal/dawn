@@ -39,7 +39,7 @@ class D3D11ShaderCachingTests : public DawnTest {
   protected:
     void SetUp() override {
         DawnTest::SetUp();
-        DAWN_TEST_UNSUPPORTED_IF(UsesWire() || !IsD3D11());
+        DAWN_TEST_UNSUPPORTED_IF(!IsD3D11());
     }
 };
 

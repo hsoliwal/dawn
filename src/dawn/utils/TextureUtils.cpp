@@ -430,7 +430,6 @@ bool IsSnorm16TextureFormat(wgpu::TextureFormat textureFormat) {
     }
 }
 
-#if !DAWN_PLATFORM_IS(EMSCRIPTEN)
 bool IsMultiPlanarFormat(wgpu::TextureFormat textureFormat) {
     switch (textureFormat) {
         case wgpu::TextureFormat::R8BG8Biplanar420Unorm:
@@ -521,7 +520,6 @@ SubsamplingFactor GetMultiPlaneTextureSubsamplingFactor(wgpu::TextureFormat text
             return {0, 0};
     }
 }
-#endif  // !DAWN_PLATFORM_IS(EMSCRIPTEN)
 
 uint32_t GetTexelBlockSizeInBytes(wgpu::TextureFormat textureFormat) {
     switch (textureFormat) {
@@ -657,7 +655,6 @@ uint32_t GetTexelBlockSizeInBytes(wgpu::TextureFormat textureFormat) {
         case wgpu::TextureFormat::RGBA16Snorm:
             return 8u;
 
-#if !DAWN_PLATFORM_IS(EMSCRIPTEN)
         // Block size of a multi-planar format depends on aspect.
         case wgpu::TextureFormat::R8BG8Biplanar420Unorm:
         case wgpu::TextureFormat::R8BG8Biplanar422Unorm:
@@ -667,7 +664,6 @@ uint32_t GetTexelBlockSizeInBytes(wgpu::TextureFormat textureFormat) {
         case wgpu::TextureFormat::R10X6BG10X6Biplanar444Unorm:
         case wgpu::TextureFormat::R8BG8A8Triplanar420Unorm:
         case wgpu::TextureFormat::OpaqueYCbCrAndroid:
-#endif  // !DAWN_PLATFORM_IS(EMSCRIPTEN)
 
         case wgpu::TextureFormat::Undefined:
             break;
@@ -792,7 +788,6 @@ uint32_t GetTextureFormatBlockWidth(wgpu::TextureFormat textureFormat) {
         case wgpu::TextureFormat::RGBA16Snorm:
             return 1u;
 
-#if !DAWN_PLATFORM_IS(EMSCRIPTEN)
         // Block size of a multi-planar format depends on aspect.
         case wgpu::TextureFormat::R8BG8Biplanar420Unorm:
         case wgpu::TextureFormat::R8BG8Biplanar422Unorm:
@@ -802,7 +797,6 @@ uint32_t GetTextureFormatBlockWidth(wgpu::TextureFormat textureFormat) {
         case wgpu::TextureFormat::R10X6BG10X6Biplanar444Unorm:
         case wgpu::TextureFormat::R8BG8A8Triplanar420Unorm:
         case wgpu::TextureFormat::OpaqueYCbCrAndroid:
-#endif  // !DAWN_PLATFORM_IS(EMSCRIPTEN)
 
         case wgpu::TextureFormat::Undefined:
             break;
@@ -927,7 +921,6 @@ uint32_t GetTextureFormatBlockHeight(wgpu::TextureFormat textureFormat) {
         case wgpu::TextureFormat::RGBA16Snorm:
             return 1u;
 
-#if !DAWN_PLATFORM_IS(EMSCRIPTEN)
         // Block size of a multi-planar format depends on aspect.
         case wgpu::TextureFormat::R8BG8Biplanar420Unorm:
         case wgpu::TextureFormat::R8BG8Biplanar422Unorm:
@@ -937,7 +930,6 @@ uint32_t GetTextureFormatBlockHeight(wgpu::TextureFormat textureFormat) {
         case wgpu::TextureFormat::R10X6BG10X6Biplanar444Unorm:
         case wgpu::TextureFormat::R8BG8A8Triplanar420Unorm:
         case wgpu::TextureFormat::OpaqueYCbCrAndroid:
-#endif  // !DAWN_PLATFORM_IS(EMSCRIPTEN)
 
         case wgpu::TextureFormat::Undefined:
             break;
@@ -1157,7 +1149,6 @@ const char* GetWGSLImageFormatQualifier(wgpu::TextureFormat textureFormat) {
         case wgpu::TextureFormat::RG11B10Ufloat:
             return "rg11b10ufloat";
 
-#if !DAWN_PLATFORM_IS(EMSCRIPTEN)
         // Unorm and Snorm 16 formats.
         case wgpu::TextureFormat::R16Unorm:
             return "r16unorm";
@@ -1171,7 +1162,6 @@ const char* GetWGSLImageFormatQualifier(wgpu::TextureFormat textureFormat) {
             return "rgba16unorm";
         case wgpu::TextureFormat::RGBA16Snorm:
             return "rgba16snorm";
-#endif  // !DAWN_PLATFORM_IS(EMSCRIPTEN)
 
         default:
             DAWN_UNREACHABLE();

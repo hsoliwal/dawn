@@ -35,7 +35,6 @@ class AllocatorMemoryInstrumentationTest : public DawnTest {
     void SetUp() override {
         DawnTest::SetUp();
         // Native GetAllocatorMemoryInfo method is unsupported on wire.
-        DAWN_TEST_UNSUPPORTED_IF(UsesWire());
     }
 };
 

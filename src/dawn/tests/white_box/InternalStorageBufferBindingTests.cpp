@@ -44,7 +44,6 @@ class InternalStorageBufferBindingTests : public DawnTest {
 
     void SetUp() override {
         DawnTest::SetUp();
-        DAWN_TEST_UNSUPPORTED_IF(UsesWire());
     }
 
     wgpu::ComputePipeline CreateComputePipelineWithInternalStorage() {

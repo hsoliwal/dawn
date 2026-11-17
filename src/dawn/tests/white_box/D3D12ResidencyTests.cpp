@@ -54,7 +54,6 @@ class D3D12ResidencyTestBase : public DawnTest {
   protected:
     void SetUp() override {
         DawnTest::SetUp();
-        DAWN_TEST_UNSUPPORTED_IF(UsesWire());
 
         // Restrict Dawn's budget to create an artificial budget.
         native::d3d12::Device* d3dDevice =

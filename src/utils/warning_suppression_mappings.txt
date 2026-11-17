@@ -99,7 +99,7 @@ src:*build{/,\\}build_config.h
 src:*third_party{/,\\}v8{/,\\}src{/,\\}include{/,\\}*
 # minizip's ioapi.h tests __ANDROID_API__ on platforms that do not define it.
 src:*third_party{/,\\}zlib{/,\\}contrib{/,\\}minizip{/,\\}ioapi.h
-# GoogleTest's gtest-port.h tests GTEST_HAS_DEATH_TEST with #if on platforms that do not define it (e.g. Emscripten, iOS).
+# GoogleTest's gtest-port.h tests GTEST_HAS_DEATH_TEST with #if on platforms that do not define it (e.g. iOS).
 src:*third_party{/,\\}googletest{/,\\}{,src/,src\\}googletest{/,\\}include{/,\\}gtest{/,\\}internal{/,\\}gtest-port.h
 
 [unique-object-duplication]

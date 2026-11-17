@@ -475,7 +475,6 @@ DAWN_INSTANTIATE_TEST(
 class RenderPassRenderAreaTest : public RenderPassTest {
   protected:
     void SetUp() override {
-        DAWN_TEST_UNSUPPORTED_IF(UsesWire());
         RenderPassTest::SetUp();
     }
 

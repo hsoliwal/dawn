@@ -43,7 +43,6 @@ class VulkanErrorInjectorTests : public DawnTest {
   public:
     void SetUp() override {
         DawnTest::SetUp();
-        DAWN_TEST_UNSUPPORTED_IF(UsesWire());
 
         mDeviceVk = native::vulkan::ToBackend(native::FromAPI(device.Get()));
     }

@@ -39,7 +39,6 @@ using ::testing::StrEq;
 class ToggleValidationTest : public ValidationTest {
     void SetUp() override {
         ValidationTest::SetUp();
-        DAWN_SKIP_TEST_IF(UsesWire());
     }
 };
 

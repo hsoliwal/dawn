@@ -41,7 +41,6 @@ endif ()
 
 dawn_add_library(
   dawn_glfw
-  ENABLE_EMSCRIPTEN
   UTILITY_TARGET dawn_internal_config
   HEADERS
     "${headers}"

@@ -89,20 +89,8 @@ if (DAWN_BUILD_PROTOBUF AND EXISTS "${DAWN_PROTOBUF_DIR}/cmake")
     include("protobuf.cmake")
 endif()
 
-################################################################################
-# Start of Emscripten enabled third party directories
-#   To minimize the number of third party targets to make when building with
-#   Emscripten to the minimal set, only subdirectories added within the Start
-#   and End of the Emscripten block are enabled .
-################################################################################
 if ((DAWN_BUILD_TESTS OR TINT_BUILD_TESTS) AND NOT TARGET gmock)
     set(gtest_force_shared_crt ON CACHE BOOL "Controls whether a shared run-time library should be used even when Google Test is built as static library" FORCE)
-    if (EMSCRIPTEN)
-        # For Emscripten builds, we need to disable pthreads.
-        # https://discourse.cmake.org/t/set-definitions-for-external-sub-directory/1136
-        set(gtest_disable_pthreads ON)
-    endif()
-
     add_subdirectory(${DAWN_GOOGLETEST_DIR} "${CMAKE_CURRENT_BINARY_DIR}/googletest" EXCLUDE_FROM_ALL)
 
     # The CMake target GTest::gmock_main always sets -fexceptions, which is
@@ -128,13 +116,6 @@ if ((DAWN_BUILD_TESTS OR TINT_BUILD_TESTS) AND NOT TARGET gmock)
             "${gmock_SOURCE_DIR}/include"
     )
 endif()
-################################################################################
-# End of Emscripten enabled third party directories
-################################################################################
-if (EMSCRIPTEN)
-    return()
-endif()
-
 # Force ENABLE_RTTI in spirv-tools and glslang.
 set(ENABLE_RTTI ${DAWN_ENABLE_RTTI} CACHE BOOL "" FORCE)
 

@@ -42,7 +42,6 @@ class D3D11BufferTests : public DawnTest {
   protected:
     void SetUp() override {
         DawnTest::SetUp();
-        DAWN_TEST_UNSUPPORTED_IF(UsesWire());
     }
 
     wgpu::Buffer CreateBuffer(uint32_t bufferSize, wgpu::BufferUsage usage) {

@@ -240,7 +240,6 @@ TEST_P(MaxLimitTests, MaxBufferBindingSize) {
         device.PopErrorScope(wgpu::CallbackMode::AllowProcessEvents,
                              [&oomResult](wgpu::PopErrorScopeStatus, wgpu::ErrorType type,
                                           wgpu::StringView) { oomResult = type; });
-        FlushWire();
         instance.ProcessEvents();
         // Max buffer size is smaller than the max buffer binding size.
         DAWN_TEST_UNSUPPORTED_IF(oomResult == wgpu::ErrorType::OutOfMemory);
@@ -905,7 +904,6 @@ TEST_P(MaxLimitTests, CreateBindGroupMaxStorageBufferBindingSize) {
         device.PopErrorScope(wgpu::CallbackMode::AllowProcessEvents,
                              [&oomResult](wgpu::PopErrorScopeStatus, wgpu::ErrorType errorType,
                                           wgpu::StringView) { oomResult = errorType; });
-        FlushWire();
         instance.ProcessEvents();
 
         if (oomResult != wgpu::ErrorType::OutOfMemory && buffer != nullptr) {

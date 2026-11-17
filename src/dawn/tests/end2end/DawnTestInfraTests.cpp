@@ -50,13 +50,6 @@ TEST_P(DawnTestInfraTest, SupportedFeatureReturnsTrue) {
     EXPECT_TRUE(SupportsFeatures({wgpu::FeatureName::CoreFeaturesAndLimits}));
 }
 
-// Verify SupportsFeatures returns false in wire mode with DawnNative. All native adapters
-// should support it but the wire explicitly filters out (see dawn/wire/SupportedFeatures.cpp).
-TEST_P(DawnTestInfraTest, WireUnsupportedFeatureReturnsFalse) {
-    DAWN_TEST_UNSUPPORTED_IF(!UsesWire());
-    EXPECT_FALSE(SupportsFeatures({wgpu::FeatureName::DawnNative}));
-}
-
 DAWN_INSTANTIATE_TEST(DawnTestInfraTest,
                       D3D11Backend(),
                       D3D12Backend(),

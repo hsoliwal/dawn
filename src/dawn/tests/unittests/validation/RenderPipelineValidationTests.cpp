@@ -413,9 +413,6 @@ TEST_F(RenderPipelineValidationTest, ColorTargetStateRequired) {
 // Test that targetCount is checked before dereferencing targets.
 TEST_F(RenderPipelineValidationTest, TargetCountOverLimitsNotAccessed) {
     // This is a test for dawn::native only.
-    if (UsesWire()) {
-        GTEST_SKIP();
-    }
 
     // Check that targets is not accessed if their count is higher that the color attachment limit.
     {
@@ -1713,9 +1710,6 @@ TEST_F(RenderPipelineValidationTest, EntryPointNameRequiredIfNoCompatibleEntryPo
 // Test that bufferCount is checked before dereferencing buffers.
 TEST_F(RenderPipelineValidationTest, VertexBufferCountOverLimitsNotAccessed) {
     // This is a test for dawn::native only.
-    if (UsesWire()) {
-        GTEST_SKIP();
-    }
 
     // Check that buffers is not accessed if their count is higher that the vertex buffer limit.
     {

@@ -87,16 +87,13 @@ class MultithreadTests : public DawnTest {
     std::vector<wgpu::FeatureName> GetRequiredFeatures() override {
         std::vector<wgpu::FeatureName> features;
         // TODO(crbug.com/dawn/1678): DawnWire doesn't support thread safe API yet.
-        if (!UsesWire()) {
-            features.push_back(wgpu::FeatureName::ImplicitDeviceSynchronization);
-        }
+        features.push_back(wgpu::FeatureName::ImplicitDeviceSynchronization);
         return features;
     }
 
     void SetUp() override {
         DawnTest::SetUp();
         // TODO(crbug.com/dawn/1678): DawnWire doesn't support thread safe API yet.
-        DAWN_TEST_UNSUPPORTED_IF(UsesWire());
     }
 
     wgpu::Buffer CreateBuffer(uint32_t size, wgpu::BufferUsage usage) {

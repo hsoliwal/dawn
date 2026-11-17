@@ -30,7 +30,6 @@
 
 #include "src/dawn/tests/unittests/validation/ValidationTest.h"
 #include "src/dawn/utils/WGPUHelpers.h"
-#include "src/dawn/utils/WireHelper.h"
 #include "src/utils/compiler.h"
 
 namespace dawn {
@@ -49,7 +48,7 @@ class WGSLFeatureValidationTest : public ValidationTest {
     // explicitly each time.
     void SetUp() override {}
     void SetUp(InstanceSpec spec) {
-        // The blocklist that will be shared between both the native and wire descriptors.
+        // The blocklist of the native instance descriptor.
         wgpu::DawnWGSLBlocklist blocklist;
         blocklist.blocklistedFeatureCount = spec.blocklist.size();
         blocklist.blocklistedFeatures = spec.blocklist.data();
@@ -74,17 +73,7 @@ class WGSLFeatureValidationTest : public ValidationTest {
         wgpu::InstanceDescriptor nativeDesc;
         nativeDesc.nextInChain = &togglesDesc;
 
-        // Build the wire instance descriptor.
-        wgpu::DawnWireWGSLControl wgslControl;
-        wgslControl.nextInChain = &blocklist;
-        wgslControl.enableExperimental = spec.allowUnsafeAPIs || spec.exposeExperimental;
-        wgslControl.enableUnsafe = spec.allowUnsafeAPIs;
-        wgslControl.enableTesting = spec.useTestingFeatures;
-
-        wgpu::InstanceDescriptor wireDesc;
-        wireDesc.nextInChain = &wgslControl;
-
-        ValidationTest::SetUp(&nativeDesc, &wireDesc);
+        ValidationTest::SetUp(&nativeDesc);
     }
 };
 

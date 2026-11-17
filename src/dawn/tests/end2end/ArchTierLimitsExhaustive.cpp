@@ -67,7 +67,6 @@ class TierArchInfoTest_TieredMaxLimits : public TierArchInfoTestBase {
     void SetUp() override {
         TierArchInfoTestBase::SetUp();
 
-        DAWN_TEST_UNSUPPORTED_IF(UsesWire());
     }
 
     bool GetRequireUseTieredLimits() override { return true; }

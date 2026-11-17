@@ -40,7 +40,6 @@ class MetalAutoreleasePoolTests : public DawnTest {
   private:
     void SetUp() override {
         DawnTest::SetUp();
-        DAWN_TEST_UNSUPPORTED_IF(UsesWire());
 
         mMtlQueue = ToBackend(FromAPI(device.Get())->GetQueue());
     }

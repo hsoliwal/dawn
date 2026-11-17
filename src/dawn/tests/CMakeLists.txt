@@ -550,10 +550,6 @@ target_link_libraries(dawn_native_unittest_mocks PRIVATE
 ################################################################################
 
 set(unittest_sources
-    "${Dawn_SOURCE_DIR}/src/dawn/wire/client/ClientMemoryTransferService_mock.cpp"
-    "${Dawn_SOURCE_DIR}/src/dawn/wire/client/ClientMemoryTransferService_mock.h"
-    "${Dawn_SOURCE_DIR}/src/dawn/wire/server/ServerMemoryTransferService_mock.cpp"
-    "${Dawn_SOURCE_DIR}/src/dawn/wire/server/ServerMemoryTransferService_mock.h"
     "${Dawn_SOURCE_DIR}/src/utils/assert_test.cc"
     "${Dawn_SOURCE_DIR}/src/utils/heap_array_test.cc"
     "${Dawn_SOURCE_DIR}/src/utils/numeric_test.cc"
@@ -686,30 +682,6 @@ set(unittest_sources
     "unittests/validation/WritableBufferBindingAliasingValidationTests.cpp"
     "unittests/validation/WritableTextureBindingAliasingValidationTests.cpp"
     "unittests/validation/WriteBufferTests.cpp"
-    "unittests/wire/WireAdapterTests.cpp"
-    "unittests/wire/WireArgumentTests.cpp"
-    "unittests/wire/WireBasicTests.cpp"
-    "unittests/wire/WireBufferMappingTests.cpp"
-    "unittests/wire/WireConfusionDeathTests.cpp"
-    "unittests/wire/WireCreatePipelineAsyncTests.cpp"
-    "unittests/wire/WireDeviceLifetimeTests.cpp"
-    "unittests/wire/WireDisconnectTests.cpp"
-    "unittests/wire/WireErrorCallbackTests.cpp"
-    "unittests/wire/WireExtensionTests.cpp"
-    "unittests/wire/WireFutureTest.cpp"
-    "unittests/wire/WireFutureTest.h"
-    "unittests/wire/WireInjectBufferTests.cpp"
-    "unittests/wire/WireInjectInstanceTests.cpp"
-    "unittests/wire/WireInjectSurfaceTests.cpp"
-    "unittests/wire/WireInjectTextureTests.cpp"
-    "unittests/wire/WireInstanceTests.cpp"
-    "unittests/wire/WireMemoryTransferServiceTests.cpp"
-    "unittests/wire/WireOptionalTests.cpp"
-    "unittests/wire/WireQueueTests.cpp"
-    "unittests/wire/WireShaderModuleTests.cpp"
-    "unittests/wire/WireSpecificCommandTests.cpp"
-    "unittests/wire/WireTest.cpp"
-    "unittests/wire/WireTest.h"
 )
 
 set(unittest_conditional_private_depends)
@@ -721,7 +693,6 @@ set(unittest_conditional_private_depends)
 if (WIN32)
     list(APPEND unittest_sources
         "unittests/WindowsUtilsTests.cpp"
-        "unittests/wire/WireInlineSharedMemoryManagerTests.cpp"
     )
 endif()
 
@@ -766,7 +737,7 @@ endif()
 
 add_library(dawn_unittest_objects OBJECT ${unittest_sources})
 common_compile_options(dawn_unittest_objects)
-# Wire unit tests include the generated mock WebGPU header.
+# Unit tests include the generated mock WebGPU header.
 add_dependencies(dawn_unittest_objects dawn_native_unittest_mocks)
 if (MSVC)
     # Some unit test translation units exceed the default COFF section limit.
@@ -790,7 +761,6 @@ target_link_libraries(dawn_unittest_objects PRIVATE
     dawn_test_infra
     dawn_test_utils
     dawn_wgpu_utils
-    dawn_wire
     dawncpp
     gmock
     libtint

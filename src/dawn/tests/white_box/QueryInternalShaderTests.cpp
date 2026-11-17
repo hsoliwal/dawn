@@ -121,7 +121,6 @@ class QueryInternalShaderTests : public DawnTest {
     void SetUp() override {
         DawnTest::SetUp();
 
-        DAWN_TEST_UNSUPPORTED_IF(UsesWire());
         DAWN_TEST_UNSUPPORTED_IF(HasToggleEnabled("disable_timestamp_query_conversion"));
 
         // The test flakily fails on Mali GPUs (see crbug.com/452388097).

@@ -66,7 +66,6 @@
     StartExpectDeviceError();                                          \
     statement;                                                         \
     device.Tick();                                                     \
-    FlushWire();                                                       \
     if (!EndExpectDeviceError()) {                                     \
         ADD_FAILURE() << "Expected device error in:\n " << #statement; \
     }                                                                  \
@@ -77,7 +76,6 @@
     StartExpectDeviceError(matcher);                                   \
     statement;                                                         \
     device.Tick();                                                     \
-    FlushWire();                                                       \
     if (!EndExpectDeviceError()) {                                     \
         ADD_FAILURE() << "Expected device error in:\n " << #statement; \
     }                                                                  \
@@ -88,7 +86,6 @@
     StartExpectDeviceLog(type, messageMatcher);                              \
     statement;                                                               \
     device.Tick();                                                           \
-    FlushWire();                                                             \
     if (!EndExpectDeviceLog()) {                                             \
         ADD_FAILURE() << "Missing expected device log in:\n " << #statement; \
     }                                                                        \
@@ -99,7 +96,6 @@
     StartExpectNoDeviceLog();           \
     statement;                          \
     device.Tick();                      \
-    FlushWire();                        \
     EndExpectNoDeviceLog();             \
     do {                                \
     } while (0)
@@ -116,11 +112,9 @@
 
 #define EXPECT_DEPRECATION_WARNINGS(statement, n)                          \
     do {                                                                   \
-        FlushWire();                                                       \
         uint64_t warningsBefore = GetInstanceDeprecationCountForTesting(); \
         EXPECT_EQ(mLastWarningCount, warningsBefore);                      \
         statement;                                                         \
-        FlushWire();                                                       \
         uint64_t warningsAfter = GetInstanceDeprecationCountForTesting();  \
         EXPECT_EQ(warningsAfter, warningsBefore + n);                      \
         mLastWarningCount = warningsAfter;                                 \
@@ -175,9 +169,6 @@ class ValidationTest : public testing::Test {
 
     void ExpectDeviceDestruction();
 
-    bool UsesWire() const;
-
-    void FlushWire();
     void WaitForAllOperations();
 
     // Helper functions to create objects to test validation.
@@ -217,8 +208,7 @@ class ValidationTest : public testing::Test {
     virtual std::vector<const char*> GetWGSLBlocklistedFeatures();
 
     // Sets up the internal members by initializing the instances, adapter, and device.
-    void SetUp(const wgpu::InstanceDescriptor* nativeDesc,
-               const wgpu::InstanceDescriptor* wireDesc = nullptr);
+    void SetUp(const wgpu::InstanceDescriptor* nativeDesc);
 
     uint64_t GetInstanceDeprecationCountForTesting();
     // Request device and handle deprecation warning emitted during creating device.

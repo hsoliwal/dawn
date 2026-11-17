@@ -44,7 +44,6 @@ class InternalResolveAttachmentSampleTypeTests : public DawnTest {
   protected:
     void SetUp() override {
         DawnTest::SetUp();
-        DAWN_TEST_UNSUPPORTED_IF(UsesWire());
 
         // vertex shader module.
         vsModule = utils::CreateShaderModule(device, R"(

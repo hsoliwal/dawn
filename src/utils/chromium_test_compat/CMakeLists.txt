@@ -37,7 +37,6 @@ set(conditional_private_depends)
 
 dawn_add_library(
     dawn_shared_utils_chromium_test_compat
-    ENABLE_EMSCRIPTEN
     UTILITY_TARGET dawn_internal_config
     HEADERS
         ${private_headers}

@@ -70,7 +70,6 @@ endif()
 
 dawn_add_library(
     dawn_shared_utils
-    ENABLE_EMSCRIPTEN
     HEADERS
         ${private_headers}
     SOURCES
@@ -81,7 +80,6 @@ dawn_add_library(
 
 dawn_add_library(
     dawn_crash_handler
-    ENABLE_EMSCRIPTEN
     HEADERS
         "crash_handler.h"
     SOURCES

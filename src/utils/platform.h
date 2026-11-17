@@ -48,7 +48,6 @@
 //      - TVOS
 //      - MACOS
 //    - FUCHSIA
-//    - EMSCRIPTEN
 #if defined(_WIN32) || defined(_WIN64)
 #include <winapifamily.h>
 #define DAWN_PLATFORM_IS_WINDOWS 1
@@ -91,9 +90,7 @@
 #define DAWN_PLATFORM_IS_POSIX 1
 
 #elif defined(__EMSCRIPTEN__)
-#define DAWN_PLATFORM_IS_EMSCRIPTEN 1
-#define DAWN_PLATFORM_IS_POSIX 1
-#include <emscripten/emscripten.h>
+#error "Browser (Emscripten) builds were removed from this fork; build Dawn natively."
 
 #else
 #error "Unsupported platform."
@@ -237,9 +234,6 @@ static_assert(sizeof(sizeof(char)) == 4, "Expect sizeof(size_t) == 4");
 
 #if !defined(DAWN_PLATFORM_IS_FUCHSIA)
 #define DAWN_PLATFORM_IS_FUCHSIA 0
-#endif
-#if !defined(DAWN_PLATFORM_IS_EMSCRIPTEN)
-#define DAWN_PLATFORM_IS_EMSCRIPTEN 0
 #endif
 
 #if !defined(DAWN_PLATFORM_IS_X86)

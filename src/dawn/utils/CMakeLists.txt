@@ -42,7 +42,6 @@ DawnJSONGenerator(
 )
 dawn_add_library(
   dawn_wgpu_utils
-  ENABLE_EMSCRIPTEN
   UTILITY_TARGET dawn_internal_config
   PRIVATE_HEADERS
     "${DAWN_UTILS_GEN_HEADERS}"
@@ -81,19 +80,16 @@ dawn_add_library(
   UTILITY_TARGET dawn_internal_config
   PRIVATE_HEADERS
     "BinarySemaphore.h"
-    "TerribleCommandBuffer.h"
     "TestUtils.h"
     "WireHelper.h"
   SOURCES
     "BinarySemaphore.cpp"
-    "TerribleCommandBuffer.cpp"
     "TestUtils.cpp"
     "WireHelper.cpp"
   DEPENDS
     dawn_wgpu_utils
     webgpu_cpp
     dawn::dawn_common
-    dawn::dawn_wire
     dawn::partition_alloc
     absl::flat_hash_set
 )
@@ -137,7 +133,6 @@ endif ()
 
 dawn_add_library(
   dawn_system_utils
-  ENABLE_EMSCRIPTEN
   UTILITY_TARGET dawn_internal_config
   PRIVATE_HEADERS
     ${private_system_headers}

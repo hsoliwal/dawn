@@ -84,7 +84,6 @@ class GLTextureTestBase : public DawnTest {
     void SetUp() override {
         DawnTest::SetUp();
         DAWN_TEST_UNSUPPORTED_IF(!SupportsFeatures({wgpu::FeatureName::ANGLETextureSharing}));
-        DAWN_TEST_UNSUPPORTED_IF(UsesWire());
 
         // Create a second GL device from which we can vend textures.
         mSecondDevice = CreateDevice();

@@ -40,14 +40,6 @@
         "copyright_year": "2019"
     },
 
-    "INTERNAL_HAVE_EMDAWNWEBGPU_HEADER": {
-        "category": "structure",
-        "tags": ["emscripten"],
-        "_comment": "TODO(issues.chromium.org/issues/366932309): The struct must have at least one field.",
-        "members": [
-            {"name": "unused", "type": "bool", "default": "false"}
-        ]
-    },
 
     "create instance": {
         "category": "function",
@@ -112,7 +104,6 @@
     },
     "request adapter status": {
         "category": "enum",
-        "emscripten_no_enum_table": true,
         "values": [
             {"value": 1, "name": "success"},
             {"value": 2, "name": "callback cancelled"},
@@ -201,7 +192,6 @@
     },
     "adapter type": {
         "category": "enum",
-        "emscripten_no_enum_table": true,
         "values": [
             {"value": 1, "name": "discrete GPU"},
             {"value": 2, "name": "integrated GPU"},
@@ -311,7 +301,7 @@
     "address mode": {
         "category": "enum",
         "values": [
-            {"value": 0, "name": "undefined", "jsrepr": "undefined"},
+            {"value": 0, "name": "undefined"},
             {"value": 1, "name": "clamp to edge"},
             {"value": 2, "name": "repeat"},
             {"value": 3, "name": "mirror repeat"}
@@ -319,9 +309,8 @@
     },
     "backend type": {
         "category": "enum",
-        "emscripten_no_enum_table": true,
         "values": [
-            {"value": 0, "name": "undefined", "jsrepr": "undefined", "valid": false},
+            {"value": 0, "name": "undefined", "valid": false},
             {"value": 1, "name": "null"},
             {"value": 2, "name": "WebGPU"},
             {"value": 3, "name": "D3D11"},
@@ -382,8 +371,8 @@
     "buffer binding type": {
         "category": "enum",
         "values": [
-            {"value": 0, "name": "binding not used", "jsrepr": "undefined"},
-            {"value": 1, "name": "undefined", "jsrepr": "undefined", "valid": false},
+            {"value": 0, "name": "binding not used"},
+            {"value": 1, "name": "undefined", "valid": false},
             {"value": 2, "name": "uniform"},
             {"value": 3, "name": "storage"},
             {"value": 4, "name": "read only storage"}
@@ -402,8 +391,8 @@
     "sampler binding type": {
         "category": "enum",
         "values": [
-            {"value": 0, "name": "binding not used", "jsrepr": "undefined"},
-            {"value": 1, "name": "undefined", "jsrepr": "undefined", "valid": false},
+            {"value": 0, "name": "binding not used"},
+            {"value": 1, "name": "undefined", "valid": false},
             {"value": 2, "name": "filtering"},
             {"value": 3, "name": "non filtering"},
             {"value": 4, "name": "comparison"}
@@ -429,8 +418,8 @@
     "texture sample type": {
         "category": "enum",
         "values": [
-            {"value": 0, "name": "binding not used", "jsrepr": "undefined"},
-            {"value": 1, "name": "undefined", "jsrepr": "undefined", "valid": false},
+            {"value": 0, "name": "binding not used"},
+            {"value": 1, "name": "undefined", "valid": false},
             {"value": 2, "name": "float"},
             {"value": 3, "name": "unfilterable float"},
             {"value": 4, "name": "depth"},
@@ -504,8 +493,8 @@
     "storage texture access": {
         "category": "enum",
         "values": [
-            {"value": 0, "name": "binding not used", "jsrepr": "undefined"},
-            {"value": 1, "name": "undefined", "jsrepr": "undefined", "valid": false},
+            {"value": 0, "name": "binding not used"},
+            {"value": 1, "name": "undefined", "valid": false},
             {"value": 2, "name": "write only"},
             {"value": 3, "name": "read only"},
             {"value": 4, "name": "read write"}
@@ -515,7 +504,7 @@
         "category": "enum",
         "tags": ["dawn"],
         "values": [
-            {"value": 0, "name": "undefined", "jsrepr": "undefined", "valid": false},
+            {"value": 0, "name": "undefined", "valid": false},
             {"value": 1, "name": "read only"},
             {"value": 2, "name": "read write"}
         ]
@@ -574,7 +563,7 @@
     "blend factor": {
         "category": "enum",
         "values": [
-            {"value": 0, "name": "undefined", "jsrepr": "undefined"},
+            {"value": 0, "name": "undefined"},
             {"value": 1, "name": "zero"},
             {"value": 2, "name": "one"},
             {"value": 3, "name": "src"},
@@ -590,14 +579,14 @@
             {"value": 13, "name": "one minus constant"},
             {"value": 14, "name": "src1"},
             {"value": 15, "name": "one minus src1"},
-            {"value": 16, "name": "src1 alpha", "jsrepr": "'src1-alpha'"},
-            {"value": 17, "name": "one minus src1 alpha", "jsrepr": "'one-minus-src1-alpha'"}
+            {"value": 16, "name": "src1 alpha"},
+            {"value": 17, "name": "one minus src1 alpha"}
         ]
     },
     "blend operation": {
         "category": "enum",
         "values": [
-            {"value": 0, "name": "undefined", "jsrepr": "undefined"},
+            {"value": 0, "name": "undefined"},
             {"value": 1, "name": "add"},
             {"value": 2, "name": "subtract"},
             {"value": 3, "name": "reverse subtract"},
@@ -606,15 +595,14 @@
         ]
     },
     "bool": {
-        "category": "native",
-        "wasm type": "i"
+        "category": "native"
     },
     "optional bool": {
         "category": "enum",
         "values": [
             {"value": 0, "name": "false"},
             {"value": 1, "name": "true"},
-            {"value": 2, "name": "undefined", "jsrepr": "undefined"}
+            {"value": 2, "name": "undefined"}
         ]
     },
     "string view": {
@@ -768,7 +756,6 @@
     },
     "map async status": {
         "category": "enum",
-        "emscripten_no_enum_table": true,
         "values": [
             {"value": 1, "name": "success"},
             {"value": 2, "name": "callback cancelled"},
@@ -778,7 +765,6 @@
     },
     "buffer map state": {
         "category": "enum",
-        "emscripten_string_to_int": true,
         "values": [
             {"value": 1, "name": "unmapped"},
             {"value": 2, "name": "pending"},
@@ -997,7 +983,7 @@
     "compare function": {
         "category": "enum",
         "values": [
-            {"value": 0, "name": "undefined", "jsrepr": "undefined"},
+            {"value": 0, "name": "undefined"},
             {"value": 1, "name": "never"},
             {"value": 2, "name": "less"},
             {"value": 3, "name": "equal"},
@@ -1053,7 +1039,7 @@
         "category": "structure",
         "chained": "in",
         "chain roots": ["compilation message"],
-        "tags": ["dawn", "emscripten"],
+        "tags": ["dawn"],
         "members": [
             {"name": "line pos", "type": "uint64_t"},
             {"name": "offset", "type": "uint64_t"},
@@ -1062,8 +1048,6 @@
     },
     "compilation message type": {
         "category": "enum",
-        "emscripten_string_to_int": true,
-        "emscripten_no_enum_table": true,
         "values": [
             {"value": 1, "name": "error"},
             {"value": 2, "name": "warning"},
@@ -1115,7 +1099,7 @@
             },
             {
                 "name": "write timestamp",
-                "tags": ["emscripten", "dawn"],
+                "tags": ["dawn"],
                 "args": [
                     {"name": "query set", "type": "query set"},
                     {"name": "query index", "type": "uint32_t"}
@@ -1175,7 +1159,7 @@
     "composite alpha mode": {
         "category": "enum",
         "values": [
-            {"value": 0, "name": "auto", "jsrepr": "undefined"},
+            {"value": 0, "name": "auto"},
             {"value": 1, "name": "opaque"},
             {"value": 2, "name": "premultiplied"},
             {"value": 3, "name": "unpremultiplied"},
@@ -1255,7 +1239,6 @@
     },
     "create pipeline async status": {
         "category": "enum",
-        "emscripten_no_enum_table": true,
         "values": [
             {"value": 1, "name": "success"},
             {"value": 2, "name": "callback cancelled"},
@@ -1281,7 +1264,7 @@
     "cull mode": {
         "category": "enum",
         "values": [
-            {"value": 0, "name": "undefined", "jsrepr": "undefined"},
+            {"value": 0, "name": "undefined"},
             {"value": 1, "name": "none"},
             {"value": 2, "name": "front"},
             {"value": 3, "name": "back"}
@@ -1626,18 +1609,15 @@
     },
     "device lost reason": {
         "category": "enum",
-        "emscripten_string_to_int": true,
-        "emscripten_no_enum_table": true,
         "values": [
             {"value": 1, "name": "unknown"},
             {"value": 2, "name": "destroyed"},
-            {"value": 3, "name": "callback cancelled", "emscripten_string_to_int": false},
-            {"value": 4, "name": "failed creation", "emscripten_string_to_int": false}
+            {"value": 3, "name": "callback cancelled"},
+            {"value": 4, "name": "failed creation"}
         ]
     },
     "double": {
-        "category": "native",
-        "wasm type": "d"
+        "category": "native"
     },
     "uncaptured error callback": {
         "category": "callback function",
@@ -1655,7 +1635,6 @@
     },
     "pop error scope status": {
         "category": "enum",
-        "emscripten_no_enum_table": true,
         "values": [
             {"value": 1, "name": "success"},
             {"value": 2, "name": "callback cancelled"},
@@ -1794,7 +1773,6 @@
     },
     "error type": {
         "category": "enum",
-        "emscripten_no_enum_table": true,
         "values": [
             {"value": 1, "name": "no error"},
             {"value": 2, "name": "validation"},
@@ -2496,14 +2474,13 @@
     "feature level": {
         "category": "enum",
         "values": [
-            {"value": 0, "name": "undefined", "jsrepr": "undefined"},
+            {"value": 0, "name": "undefined"},
             {"value": 1, "name": "compatibility"},
             {"value": 2, "name": "core"}
         ]
     },
     "feature name": {
         "category": "enum",
-        "emscripten_string_to_int": true,
         "values": [
             {"value": 1, "name": "core features and limits"},
             {"value": 2, "name": "depth clip control"},
@@ -2518,8 +2495,8 @@
             {"value": 11, "name": "shader f16"},
             {"value": 12, "name": "RG11B10 ufloat renderable"},
             {"value": 13, "name": "BGRA8 unorm storage"},
-            {"value": 14, "name": "float32 filterable", "jsrepr": "'float32-filterable'"},
-            {"value": 15, "name": "float32 blendable", "jsrepr": "'float32-blendable'"},
+            {"value": 14, "name": "float32 filterable"},
+            {"value": 15, "name": "float32 blendable"},
             {"value": 16, "name": "clip distances"},
             {"value": 17, "name": "dual source blending"},
             {"value": 18, "name": "subgroups"},
@@ -2542,7 +2519,7 @@
             {"value": 9, "name": "ANGLE texture sharing", "tags": ["dawn", "native"]},
             {"value": 10, "name": "pixel local storage coherent", "tags": ["dawn"]},
             {"value": 11, "name": "pixel local storage non coherent", "tags": ["dawn"]},
-            {"value": 12, "name": "unorm16 texture formats", "tags": ["dawn", "emscripten"], "jsrepr": "'chromium-experimental-unorm16-texture-formats'"},
+            {"value": 12, "name": "unorm16 texture formats", "tags": ["dawn"]},
             {"value": 13, "name": "multi planar format extended usages", "tags": ["dawn"]},
             {"value": 14, "name": "multi planar format p010", "tags": ["dawn"]},
             {"value": 15, "name": "host mapped pointer", "tags": ["dawn"]},
@@ -2581,10 +2558,10 @@
 
             {"value": 47, "name": "dawn load resolve texture", "tags": ["dawn"]},
             {"value": 48, "name": "dawn partial load resolve texture", "tags": ["dawn"]},
-            {"value": 49, "name": "multi draw indirect", "tags": ["dawn", "emscripten"], "jsrepr": "'chromium-experimental-multi-draw-indirect'"},
+            {"value": 49, "name": "multi draw indirect", "tags": ["dawn"]},
             {"value": 50, "name": "dawn texel copy buffer row alignment", "tags": ["dawn"]},
             {"value": 51, "name": "flexible texture views", "tags": ["dawn"]},
-            {"value": 52, "name": "chromium experimental subgroup matrix", "tags": ["dawn", "emscripten"]},
+            {"value": 52, "name": "chromium experimental subgroup matrix", "tags": ["dawn"]},
             {"value": 53, "name": "shared fence EGL sync", "tags": ["dawn", "native"]},
             {"value": 54, "name": "dawn device allocator control", "tags": ["dawn"]},
             {"value": 55, "name": "adapter properties WGPU", "tags": ["dawn"]},
@@ -2605,14 +2582,13 @@
     "filter mode": {
         "category": "enum",
         "values": [
-            {"value": 0, "name": "undefined", "jsrepr": "undefined"},
+            {"value": 0, "name": "undefined"},
             {"value": 1, "name": "nearest"},
             {"value": 2, "name": "linear"}
         ]
     },
     "float": {
-        "category": "native",
-        "wasm type": "f"
+        "category": "native"
     },
     "dawn format capabilities": {
       "category": "structure",
@@ -2641,7 +2617,7 @@
     "front face": {
         "category": "enum",
         "values": [
-            {"value": 0, "name": "undefined", "jsrepr": "undefined"},
+            {"value": 0, "name": "undefined"},
             {"value": 1, "name": "CCW"},
             {"value": 2, "name": "CW"}
         ]
@@ -2683,7 +2659,7 @@
     "index format": {
         "category": "enum",
         "values": [
-            {"value": 0, "name": "undefined", "jsrepr": "undefined"},
+            {"value": 0, "name": "undefined"},
             {"value": 1, "name": "uint16"},
             {"value": 2, "name": "uint32"}
         ]
@@ -2736,7 +2712,6 @@
     },
     "callback mode": {
         "category": "enum",
-        "emscripten_no_enum_table": true,
         "values": [
             {"value": 1, "name": "wait any only"},
             {"value": 2, "name": "allow process events"},
@@ -2752,7 +2727,6 @@
     "wait status": {
         "category": "enum",
         "_comment": "TODO(crbug.com/dawn/2053): This could possibly be [[nodiscard]].",
-        "emscripten_no_enum_table": true,
         "values": [
             {"value": 1, "name": "success"},
             {"value": 2, "name": "timed out"},
@@ -2810,17 +2784,6 @@
             {"name": "limits", "type": "instance limits", "annotation": "*"}
         ]
     },
-    "dawn wire WGSL control": {
-        "category": "structure",
-        "tags": ["dawn"],
-        "chained": "in",
-        "chain roots": ["instance descriptor"],
-        "members": [
-            {"name": "enable experimental", "type": "bool", "default": "false"},
-            {"name": "enable unsafe", "type": "bool", "default": "false"},
-            {"name": "enable testing", "type": "bool", "default": "false"}
-        ]
-    },
     "dawn injected invalid s type": {
         "category": "structure",
         "tags": ["dawn"],
@@ -2852,7 +2815,7 @@
     "vertex step mode": {
         "category": "enum",
         "values": [
-            {"value": 0, "name": "undefined", "jsrepr": "undefined"},
+            {"value": 0, "name": "undefined"},
             {"value": 1, "name": "vertex"},
             {"value": 2, "name": "instance"}
         ]
@@ -2860,7 +2823,7 @@
     "load op": {
         "category": "enum",
         "values": [
-            {"value": 0, "name": "undefined", "jsrepr": "undefined"},
+            {"value": 0, "name": "undefined"},
             {"value": 1, "name": "load"},
             {"value": 2, "name": "clear"},
             {"value": 3, "name": "expand resolve texture", "tags": ["dawn"]}
@@ -2877,7 +2840,7 @@
     "mipmap filter mode": {
         "category": "enum",
         "values": [
-            {"value": 0, "name": "undefined", "jsrepr": "undefined"},
+            {"value": 0, "name": "undefined"},
             {"value": 1, "name": "nearest"},
             {"value": 2, "name": "linear"}
         ]
@@ -2885,7 +2848,7 @@
     "store op": {
         "category": "enum",
         "values": [
-            {"value": 0, "name": "undefined", "jsrepr": "undefined"},
+            {"value": 0, "name": "undefined"},
             {"value": 1, "name": "store"},
             {"value": 2, "name": "discard"}
         ]
@@ -2969,14 +2932,13 @@
     "power preference": {
         "category": "enum",
         "values": [
-            {"value": 0, "name": "undefined", "jsrepr": "undefined"},
+            {"value": 0, "name": "undefined"},
             {"value": 1, "name": "low power"},
             {"value": 2, "name": "high performance"}
         ]
     },
     "present mode": {
         "category": "enum",
-        "emscripten_no_enum_table": true,
         "values": [
             {"value": 0, "name": "undefined"},
             {"value": 1, "name": "fifo"},
@@ -2998,7 +2960,7 @@
     "primitive topology": {
         "category": "enum",
         "values": [
-            {"value": 0, "name": "undefined", "jsrepr": "undefined"},
+            {"value": 0, "name": "undefined"},
             {"value": 1, "name": "point list"},
             {"value": 2, "name": "line list"},
             {"value": 3, "name": "line strip"},
@@ -3135,7 +3097,6 @@
     },
     "queue work done status": {
         "category": "enum",
-        "emscripten_no_enum_table": true,
         "values": [
             {"value": 1, "name": "success"},
             {"value": 2, "name": "callback cancelled"},
@@ -3457,7 +3418,7 @@
             },
             {
                 "name": "multi draw indirect",
-                "tags": ["dawn", "emscripten"],
+                "tags": ["dawn"],
                 "args": [
                     {"name": "indirect buffer", "type": "buffer"},
                     {"name": "indirect offset", "type": "uint64_t"},
@@ -3469,7 +3430,7 @@
             },
             {
                 "name": "multi draw indexed indirect",
-                "tags": ["dawn", "emscripten"],
+                "tags": ["dawn"],
                 "args": [
                     {"name": "indirect buffer", "type": "buffer"},
                     {"name": "indirect offset", "type": "uint64_t"},
@@ -3562,7 +3523,7 @@
             },
             {
                 "name": "write timestamp",
-                "tags": ["emscripten", "dawn"],
+                "tags": ["dawn"],
                 "args": [
                     {"name": "query set", "type": "query set"},
                     {"name": "query index", "type": "uint32_t"}
@@ -3639,7 +3600,6 @@
 
     "request device status": {
         "category": "enum",
-        "emscripten_no_enum_table": true,
         "values": [
             {"value": 1, "name": "success"},
             {"value": 2, "name": "callback cancelled"},
@@ -3954,7 +3914,7 @@
     "stencil operation": {
         "category": "enum",
         "values": [
-            {"value": 0, "name": "undefined", "jsrepr": "undefined"},
+            {"value": 0, "name": "undefined"},
             {"value": 1, "name": "keep"},
             {"value": 2, "name": "zero"},
             {"value": 3, "name": "replace"},
@@ -4030,15 +3990,6 @@
         "tags": ["art", "native"],
         "members": [
             {"name": "window", "type": "void *"}
-        ]
-    },
-    "emscripten surface source canvas HTML selector": {
-        "category": "structure",
-        "chained": "in",
-        "chain roots": ["surface descriptor"],
-        "tags": ["emscripten"],
-        "members": [
-            {"name": "selector", "type": "string view"}
         ]
     },
     "surface source metal layer": {
@@ -4153,7 +4104,6 @@
     },
     "s type": {
         "category": "enum",
-        "emscripten_no_enum_table": true,
         "values": [
             {"value": 1, "name": "shader source SPIRV"},
             {"value": 2, "name": "shader source WGSL"},
@@ -4172,8 +4122,6 @@
             {"value": 15, "name": "compatibility mode limits"},
             {"value": 16, "name": "texture binding view dimension"},
 
-            {"value": 0, "name": "emscripten surface source canvas HTML selector", "tags": ["emscripten"]},
-
             {"value": 0, "name": "surface descriptor from windows core window", "tags": ["dawn"]},
             {"value": 3, "name": "surface descriptor from windows UWP swap chain panel", "tags": ["dawn"]},
             {"value": 4, "name": "dawn texture internal usage descriptor", "tags": ["dawn"]},
@@ -4181,7 +4129,6 @@
             {"value": 6, "name": "dawn instance descriptor", "tags": ["dawn", "native"]},
             {"value": 7, "name": "dawn cache device descriptor", "tags": ["dawn", "native"]},
             {"value": 8, "name": "dawn adapter properties power preference", "tags": ["dawn", "native"]},
-            {"value": 9, "name": "dawn buffer descriptor error info from wire client", "tags": ["dawn"]},
             {"value": 10, "name": "dawn toggles descriptor", "tags": ["dawn", "native", "art_experimental"]},
             {"value": 11, "name": "dawn shader module SPIRV options descriptor", "tags": ["dawn"]},
             {"value": 12, "name": "request adapter options LUID", "tags": ["dawn", "native"]},
@@ -4194,7 +4141,6 @@
             {"value": 19, "name": "adapter properties memory heaps", "tags": ["dawn"]},
             {"value": 20, "name": "adapter properties D3D", "tags": ["dawn"]},
             {"value": 21, "name": "adapter properties vk", "tags": ["dawn"]},
-            {"value": 22, "name": "dawn wire WGSL control", "tags": ["dawn"]},
             {"value": 23, "name": "dawn WGSL blocklist", "tags": ["dawn"]},
             {"value": 24, "name": "dawn drm format capabilities", "tags": ["dawn"]},
             {"value": 25, "name": "shader module compilation options", "tags": ["dawn"]},
@@ -4231,11 +4177,11 @@
             {"value": 55, "name": "shared texture memory a hardware buffer properties", "tags": ["dawn", "native"]},
             {"value": 56, "name": "a hardware buffer properties", "tags": ["dawn", "native"]},
             {"value": 58, "name": "dawn texel copy buffer row alignment limits", "tags": ["dawn"]},
-            {"value": 59, "name": "adapter properties subgroup matrix configs", "tags": ["dawn", "emscripten"]},
+            {"value": 59, "name": "adapter properties subgroup matrix configs", "tags": ["dawn"]},
             {"value": 60, "name": "shared fence EGL sync descriptor", "tags": ["dawn", "native"]},
             {"value": 61, "name": "shared fence EGL sync export info", "tags": ["dawn", "native"]},
             {"value": 62, "name": "dawn injected invalid s type", "tags": ["dawn"]},
-            {"value": 63, "name": "dawn compilation message utf16", "tags": ["dawn", "emscripten"]},
+            {"value": 63, "name": "dawn compilation message utf16", "tags": ["dawn"]},
             {"value": 64, "name": "dawn fake buffer OOM for testing", "tags": ["dawn"]},
             {"value": 65, "name": "surface descriptor from windows WinUI swap chain panel", "tags": ["dawn"]},
             {"value": 66, "name": "dawn device allocator control", "tags": ["dawn"]},
@@ -4360,7 +4306,7 @@
     "texture aspect": {
         "category": "enum",
         "values": [
-            {"value": 0, "name": "undefined", "jsrepr": "undefined"},
+            {"value": 0, "name": "undefined"},
             {"value": 1, "name": "all"},
             {"value": 2, "name": "stencil only"},
             {"value": 3, "name": "depth only"},
@@ -4395,7 +4341,7 @@
     "texture dimension": {
         "category": "enum",
         "values": [
-            {"value": 0, "name": "undefined", "jsrepr": "undefined"},
+            {"value": 0, "name": "undefined"},
             {"value": 1, "name": "1D"},
             {"value": 2, "name": "2D"},
             {"value": 3, "name": "3D"}
@@ -4404,7 +4350,7 @@
     "texture format": {
         "category": "enum",
         "values": [
-            {"value": 0, "name": "undefined", "jsrepr": "undefined", "valid": false},
+            {"value": 0, "name": "undefined", "valid": false},
 
             {"value": 1, "name": "R8 unorm"},
             {"value": 2, "name": "R8 snorm"},
@@ -4466,60 +4412,60 @@
             {"value": 48, "name": "depth32 float"},
             {"value": 49, "name": "depth32 float stencil8"},
 
-            {"value": 50, "name": "BC1 RGBA unorm",         "jsrepr": "'bc1-rgba-unorm'"},
-            {"value": 51, "name": "BC1 RGBA unorm srgb",    "jsrepr": "'bc1-rgba-unorm-srgb'"},
-            {"value": 52, "name": "BC2 RGBA unorm",         "jsrepr": "'bc2-rgba-unorm'"},
-            {"value": 53, "name": "BC2 RGBA unorm srgb",    "jsrepr": "'bc2-rgba-unorm-srgb'"},
-            {"value": 54, "name": "BC3 RGBA unorm",         "jsrepr": "'bc3-rgba-unorm'"},
-            {"value": 55, "name": "BC3 RGBA unorm srgb",    "jsrepr": "'bc3-rgba-unorm-srgb'"},
-            {"value": 56, "name": "BC4 R unorm",            "jsrepr": "'bc4-r-unorm'"},
-            {"value": 57, "name": "BC4 R snorm",            "jsrepr": "'bc4-r-snorm'"},
-            {"value": 58, "name": "BC5 RG unorm",           "jsrepr": "'bc5-rg-unorm'"},
-            {"value": 59, "name": "BC5 RG snorm",           "jsrepr": "'bc5-rg-snorm'"},
-            {"value": 60, "name": "BC6H RGB ufloat",        "jsrepr": "'bc6h-rgb-ufloat'"},
-            {"value": 61, "name": "BC6H RGB float",         "jsrepr": "'bc6h-rgb-float'"},
-            {"value": 62, "name": "BC7 RGBA unorm",         "jsrepr": "'bc7-rgba-unorm'"},
-            {"value": 63, "name": "BC7 RGBA unorm srgb",    "jsrepr": "'bc7-rgba-unorm-srgb'"},
+            {"value": 50, "name": "BC1 RGBA unorm"},
+            {"value": 51, "name": "BC1 RGBA unorm srgb"},
+            {"value": 52, "name": "BC2 RGBA unorm"},
+            {"value": 53, "name": "BC2 RGBA unorm srgb"},
+            {"value": 54, "name": "BC3 RGBA unorm"},
+            {"value": 55, "name": "BC3 RGBA unorm srgb"},
+            {"value": 56, "name": "BC4 R unorm"},
+            {"value": 57, "name": "BC4 R snorm"},
+            {"value": 58, "name": "BC5 RG unorm"},
+            {"value": 59, "name": "BC5 RG snorm"},
+            {"value": 60, "name": "BC6H RGB ufloat"},
+            {"value": 61, "name": "BC6H RGB float"},
+            {"value": 62, "name": "BC7 RGBA unorm"},
+            {"value": 63, "name": "BC7 RGBA unorm srgb"},
 
-            {"value": 64, "name": "ETC2 RGB8 unorm",        "jsrepr": "'etc2-rgb8unorm'"},
-            {"value": 65, "name": "ETC2 RGB8 unorm srgb",   "jsrepr": "'etc2-rgb8unorm-srgb'"},
-            {"value": 66, "name": "ETC2 RGB8A1 unorm",      "jsrepr": "'etc2-rgb8a1unorm'"},
-            {"value": 67, "name": "ETC2 RGB8A1 unorm srgb", "jsrepr": "'etc2-rgb8a1unorm-srgb'"},
-            {"value": 68, "name": "ETC2 RGBA8 unorm",       "jsrepr": "'etc2-rgba8unorm'"},
-            {"value": 69, "name": "ETC2 RGBA8 unorm srgb",  "jsrepr": "'etc2-rgba8unorm-srgb'"},
-            {"value": 70, "name": "EAC R11 unorm",          "jsrepr": "'eac-r11unorm'"},
-            {"value": 71, "name": "EAC R11 snorm",          "jsrepr": "'eac-r11snorm'"},
-            {"value": 72, "name": "EAC RG11 unorm",         "jsrepr": "'eac-rg11unorm'"},
-            {"value": 73, "name": "EAC RG11 snorm",         "jsrepr": "'eac-rg11snorm'"},
+            {"value": 64, "name": "ETC2 RGB8 unorm"},
+            {"value": 65, "name": "ETC2 RGB8 unorm srgb"},
+            {"value": 66, "name": "ETC2 RGB8A1 unorm"},
+            {"value": 67, "name": "ETC2 RGB8A1 unorm srgb"},
+            {"value": 68, "name": "ETC2 RGBA8 unorm"},
+            {"value": 69, "name": "ETC2 RGBA8 unorm srgb"},
+            {"value": 70, "name": "EAC R11 unorm"},
+            {"value": 71, "name": "EAC R11 snorm"},
+            {"value": 72, "name": "EAC RG11 unorm"},
+            {"value": 73, "name": "EAC RG11 snorm"},
 
-            {"value": 74, "name": "ASTC 4x4 unorm",         "jsrepr": "'astc-4x4-unorm'"},
-            {"value": 75, "name": "ASTC 4x4 unorm srgb",    "jsrepr": "'astc-4x4-unorm-srgb'"},
-            {"value": 76, "name": "ASTC 5x4 unorm",         "jsrepr": "'astc-5x4-unorm'"},
-            {"value": 77, "name": "ASTC 5x4 unorm srgb",    "jsrepr": "'astc-5x4-unorm-srgb'"},
-            {"value": 78, "name": "ASTC 5x5 unorm",         "jsrepr": "'astc-5x5-unorm'"},
-            {"value": 79, "name": "ASTC 5x5 unorm srgb",    "jsrepr": "'astc-5x5-unorm-srgb'"},
-            {"value": 80, "name": "ASTC 6x5 unorm",         "jsrepr": "'astc-6x5-unorm'"},
-            {"value": 81, "name": "ASTC 6x5 unorm srgb",    "jsrepr": "'astc-6x5-unorm-srgb'"},
-            {"value": 82, "name": "ASTC 6x6 unorm",         "jsrepr": "'astc-6x6-unorm'"},
-            {"value": 83, "name": "ASTC 6x6 unorm srgb",    "jsrepr": "'astc-6x6-unorm-srgb'"},
-            {"value": 84, "name": "ASTC 8x5 unorm",         "jsrepr": "'astc-8x5-unorm'"},
-            {"value": 85, "name": "ASTC 8x5 unorm srgb",    "jsrepr": "'astc-8x5-unorm-srgb'"},
-            {"value": 86, "name": "ASTC 8x6 unorm",         "jsrepr": "'astc-8x6-unorm'"},
-            {"value": 87, "name": "ASTC 8x6 unorm srgb",    "jsrepr": "'astc-8x6-unorm-srgb'"},
-            {"value": 88, "name": "ASTC 8x8 unorm",         "jsrepr": "'astc-8x8-unorm'"},
-            {"value": 89, "name": "ASTC 8x8 unorm srgb",    "jsrepr": "'astc-8x8-unorm-srgb'"},
-            {"value": 90, "name": "ASTC 10x5 unorm",        "jsrepr": "'astc-10x5-unorm'"},
-            {"value": 91, "name": "ASTC 10x5 unorm srgb",   "jsrepr": "'astc-10x5-unorm-srgb'"},
-            {"value": 92, "name": "ASTC 10x6 unorm",        "jsrepr": "'astc-10x6-unorm'"},
-            {"value": 93, "name": "ASTC 10x6 unorm srgb",   "jsrepr": "'astc-10x6-unorm-srgb'"},
-            {"value": 94, "name": "ASTC 10x8 unorm",        "jsrepr": "'astc-10x8-unorm'"},
-            {"value": 95, "name": "ASTC 10x8 unorm srgb",   "jsrepr": "'astc-10x8-unorm-srgb'"},
-            {"value": 96, "name": "ASTC 10x10 unorm",       "jsrepr": "'astc-10x10-unorm'"},
-            {"value": 97, "name": "ASTC 10x10 unorm srgb",  "jsrepr": "'astc-10x10-unorm-srgb'"},
-            {"value": 98, "name": "ASTC 12x10 unorm",       "jsrepr": "'astc-12x10-unorm'"},
-            {"value": 99, "name": "ASTC 12x10 unorm srgb",  "jsrepr": "'astc-12x10-unorm-srgb'"},
-            {"value": 100, "name": "ASTC 12x12 unorm",       "jsrepr": "'astc-12x12-unorm'"},
-            {"value": 101, "name": "ASTC 12x12 unorm srgb",  "jsrepr": "'astc-12x12-unorm-srgb'"},
+            {"value": 74, "name": "ASTC 4x4 unorm"},
+            {"value": 75, "name": "ASTC 4x4 unorm srgb"},
+            {"value": 76, "name": "ASTC 5x4 unorm"},
+            {"value": 77, "name": "ASTC 5x4 unorm srgb"},
+            {"value": 78, "name": "ASTC 5x5 unorm"},
+            {"value": 79, "name": "ASTC 5x5 unorm srgb"},
+            {"value": 80, "name": "ASTC 6x5 unorm"},
+            {"value": 81, "name": "ASTC 6x5 unorm srgb"},
+            {"value": 82, "name": "ASTC 6x6 unorm"},
+            {"value": 83, "name": "ASTC 6x6 unorm srgb"},
+            {"value": 84, "name": "ASTC 8x5 unorm"},
+            {"value": 85, "name": "ASTC 8x5 unorm srgb"},
+            {"value": 86, "name": "ASTC 8x6 unorm"},
+            {"value": 87, "name": "ASTC 8x6 unorm srgb"},
+            {"value": 88, "name": "ASTC 8x8 unorm"},
+            {"value": 89, "name": "ASTC 8x8 unorm srgb"},
+            {"value": 90, "name": "ASTC 10x5 unorm"},
+            {"value": 91, "name": "ASTC 10x5 unorm srgb"},
+            {"value": 92, "name": "ASTC 10x6 unorm"},
+            {"value": 93, "name": "ASTC 10x6 unorm srgb"},
+            {"value": 94, "name": "ASTC 10x8 unorm"},
+            {"value": 95, "name": "ASTC 10x8 unorm srgb"},
+            {"value": 96, "name": "ASTC 10x10 unorm"},
+            {"value": 97, "name": "ASTC 10x10 unorm srgb"},
+            {"value": 98, "name": "ASTC 12x10 unorm"},
+            {"value": 99, "name": "ASTC 12x10 unorm srgb"},
+            {"value": 100, "name": "ASTC 12x12 unorm"},
+            {"value": 101, "name": "ASTC 12x12 unorm srgb"},
 
             {"value": 0, "name": "R8 BG8 biplanar 420 unorm", "tags": ["dawn"]},
             {"value": 1, "name": "R10X6 BG10X6 biplanar 420 unorm", "tags": ["dawn"]},
@@ -4606,7 +4552,7 @@
     "texture view dimension": {
         "category": "enum",
         "values": [
-            {"value": 0, "name": "undefined", "jsrepr": "undefined"},
+            {"value": 0, "name": "undefined"},
             {"value": 1, "name": "1D"},
             {"value": 2, "name": "2D"},
             {"value": 3, "name": "2D array"},
@@ -4628,13 +4574,13 @@
     "component swizzle": {
         "category": "enum",
         "values": [
-            {"value": 0, "name": "undefined", "jsrepr": "undefined"},
-            {"value": 1, "name": "zero", "jsrepr": "'0'"},
-            {"value": 2, "name": "one", "jsrepr": "'1'"},
-            {"value": 3, "name": "r", "jsrepr": "'r'"},
-            {"value": 4, "name": "g", "jsrepr": "'g'"},
-            {"value": 5, "name": "b", "jsrepr": "'b'"},
-            {"value": 6, "name": "a", "jsrepr": "'a'"}
+            {"value": 0, "name": "undefined"},
+            {"value": 1, "name": "zero"},
+            {"value": 2, "name": "one"},
+            {"value": 3, "name": "r"},
+            {"value": 4, "name": "g"},
+            {"value": 5, "name": "b"},
+            {"value": 6, "name": "a"}
         ]
     },
     "y cb cr vk descriptor": {
@@ -4699,39 +4645,39 @@
             {"value": 37, "name": "sint32x2"},
             {"value": 38, "name": "sint32x3"},
             {"value": 39, "name": "sint32x4"},
-            {"value": 40, "name": "unorm 10_10_10_2", "jsrepr": "'unorm10-10-10-2'"},
-            {"value": 41, "name": "unorm8x4 BGRA", "jsrepr": "'unorm8x4-bgra'"},
-            {"value": 42, "name": "snorm 10_10_10_2", "jsrepr": "'snorm10-10-10-2'"}
+            {"value": 40, "name": "unorm 10_10_10_2"},
+            {"value": 41, "name": "unorm8x4 BGRA"},
+            {"value": 42, "name": "snorm 10_10_10_2"}
         ]
     },
     "WGSL language feature name": {
         "category": "enum",
         "values": [
-            {"value": 1, "name": "readonly and readwrite storage textures",  "jsrepr": "'readonly_and_readwrite_storage_textures'"},
-            {"value": 2, "name": "packed 4x8 integer dot product", "jsrepr": "'packed_4x8_integer_dot_product'"},
-            {"value": 3, "name": "unrestricted pointer parameters", "jsrepr": "'unrestricted_pointer_parameters'"},
-            {"value": 4, "name": "pointer composite access", "jsrepr": "'pointer_composite_access'"},
-            {"value": 5, "name": "uniform buffer standard layout", "jsrepr": "'uniform_buffer_standard_layout'"},
-            {"value": 6, "name": "subgroup id", "jsrepr": "'subgroup_id'"},
-            {"value": 7, "name": "texture and sampler let", "jsrepr": "'texture_and_sampler_let'"},
-            {"value": 8, "name": "subgroup uniformity", "jsrepr": "'subgroup_uniformity'"},
-            {"value": 9, "name": "texture formats tier1", "jsrepr": "'texture_formats_tier1'"},
-            {"value": 10, "name": "linear indexing", "jsrepr": "'linear_indexing'"},
-            {"value": 11, "name": "immediate address space", "jsrepr": "'immediate_address_space'"},
-            {"value": 12, "name": "buffer view", "jsrepr": "'buffer_view'"},
-            {"value": 13, "name": "swizzle assignment", "jsrepr": "'swizzle_assignment'"},
-            {"value": 14, "name": "fragment depth", "jsrepr": "'fragment_depth'"},
+            {"value": 1, "name": "readonly and readwrite storage textures"},
+            {"value": 2, "name": "packed 4x8 integer dot product"},
+            {"value": 3, "name": "unrestricted pointer parameters"},
+            {"value": 4, "name": "pointer composite access"},
+            {"value": 5, "name": "uniform buffer standard layout"},
+            {"value": 6, "name": "subgroup id"},
+            {"value": 7, "name": "texture and sampler let"},
+            {"value": 8, "name": "subgroup uniformity"},
+            {"value": 9, "name": "texture formats tier1"},
+            {"value": 10, "name": "linear indexing"},
+            {"value": 11, "name": "immediate address space"},
+            {"value": 12, "name": "buffer view"},
+            {"value": 13, "name": "swizzle assignment"},
+            {"value": 14, "name": "fragment depth"},
 
-            {"value": 0, "name": "chromium testing unimplemented", "jsrepr": "'chromium_testing_unimplemented'", "tags": ["dawn"]},
-            {"value": 1, "name": "chromium testing unsafe experimental", "jsrepr": "'chromium_testing_unsafe_experimental'", "tags": ["dawn"]},
-            {"value": 2, "name": "chromium testing experimental", "jsrepr": "'chromium_testing_experimental'", "tags": ["dawn"]},
-            {"value": 3, "name": "chromium testing shipped with killswitch", "jsrepr": "'chromium_testing_shipped_with_killswitch'", "tags": ["dawn"]},
-            {"value": 4, "name": "chromium testing shipped", "jsrepr": "'chromium_testing_shipped'", "tags": ["dawn"]},
-            {"value": 5, "name": "sized binding array", "jsrepr": "'sized_binding_array'", "tags": ["dawn"]},
-            {"value": 6, "name": "texel buffers", "jsrepr": "'texel_buffers'", "tags": ["dawn"]},
-            {"value": 7, "name": "chromium print", "jsrepr": "'chromium_print'", "tags": ["dawn"]},
-            {"value": 8, "name": "multisampled array textures", "jsrepr": "'multisampled_array_textures'", "tags": ["dawn"]},
-            {"value": 9, "name": "unrestricted aliasing", "jsrepr": "'unrestricted_aliasing'", "tags": ["dawn"]}
+            {"value": 0, "name": "chromium testing unimplemented", "tags": ["dawn"]},
+            {"value": 1, "name": "chromium testing unsafe experimental", "tags": ["dawn"]},
+            {"value": 2, "name": "chromium testing experimental", "tags": ["dawn"]},
+            {"value": 3, "name": "chromium testing shipped with killswitch", "tags": ["dawn"]},
+            {"value": 4, "name": "chromium testing shipped", "tags": ["dawn"]},
+            {"value": 5, "name": "sized binding array", "tags": ["dawn"]},
+            {"value": 6, "name": "texel buffers", "tags": ["dawn"]},
+            {"value": 7, "name": "chromium print", "tags": ["dawn"]},
+            {"value": 8, "name": "multisampled array textures", "tags": ["dawn"]},
+            {"value": 9, "name": "unrestricted aliasing", "tags": ["dawn"]}
         ]
     },
     "whole size" : {
@@ -4813,37 +4759,30 @@
     },
     "void *": {
         "category": "native",
-        "is nullable pointer": true,
-        "wasm type": "p"
+        "is nullable pointer": true
     },
     "void const *": {
         "category": "native",
-        "is nullable pointer": true,
-        "wasm type": "p"
+        "is nullable pointer": true
     },
     "int": {
-        "category": "native",
-        "wasm type": "i"
+        "category": "native"
     },
     "int32_t": {
-        "category": "native",
-        "wasm type": "i"
+        "category": "native"
     },
     "size_t": {
         "category": "native",
-        "wasm type": "p",
         "wire transparent": false
     },
     "uint16_t": {
         "category": "native"
     },
     "uint32_t": {
-        "category": "native",
-        "wasm type": "i"
+        "category": "native"
     },
     "uint64_t": {
-        "category": "native",
-        "wasm type": "j"
+        "category": "native"
     },
     "uint8_t": {
         "category": "native"
@@ -4951,33 +4890,24 @@
           {"name": "backend type", "type": "backend type"}
       ]
     },
-    "dawn buffer descriptor error info from wire client": {
-        "category": "structure",
-        "chained": "in",
-        "chain roots": ["buffer descriptor"],
-        "tags": ["dawn"],
-        "members": [
-            {"name": "out of memory", "type": "bool", "default": "false"}
-        ]
-    },
     "subgroup matrix component type": {
         "category": "enum",
-        "tags": ["dawn", "emscripten"],
+        "tags": ["dawn"],
         "values": [
-            {"value": 1, "name": "f32", "jsrepr": "'f32'"},
-            {"value": 2, "name": "f16", "jsrepr": "'f16'"},
-            {"value": 3, "name": "u32", "jsrepr": "'u32'"},
-            {"value": 4, "name": "i32", "jsrepr": "'i32'"},
-            {"value": 5, "name": "u8", "jsrepr": "'u8'"},
-            {"value": 6, "name": "i8", "jsrepr": "'i8'"},
-            {"value": 7, "name": "bf16", "jsrepr": "'bf16'"},
-            {"value": 8, "name": "f8_e4m3", "jsrepr": "'f8_e4m3'"},
-            {"value": 9, "name": "f8_e5m2", "jsrepr": "'f8_e5m2'"}
+            {"value": 1, "name": "f32"},
+            {"value": 2, "name": "f16"},
+            {"value": 3, "name": "u32"},
+            {"value": 4, "name": "i32"},
+            {"value": 5, "name": "u8"},
+            {"value": 6, "name": "i8"},
+            {"value": 7, "name": "bf16"},
+            {"value": 8, "name": "f8_e4m3"},
+            {"value": 9, "name": "f8_e5m2"}
         ]
     },
     "subgroup matrix config": {
         "category": "structure",
-        "tags": ["dawn", "emscripten"],
+        "tags": ["dawn"],
         "members": [
             {"name": "component type", "type": "subgroup matrix component type"},
             {"name": "result component type", "type": "subgroup matrix component type"},
@@ -4992,7 +4922,7 @@
         "category": "structure",
         "chained": "out",
         "chain roots": ["adapter info"],
-        "tags": ["dawn", "emscripten"],
+        "tags": ["dawn"],
         "members": [
             {"name": "config count", "type": "size_t"},
             {"name": "configs", "type": "subgroup matrix config", "annotation": "const*", "length": "config count"}

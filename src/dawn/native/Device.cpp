@@ -1542,15 +1542,9 @@ BufferBase* DeviceBase::APICreateErrorBuffer(const BufferDescriptor* desc) {
     }
 
     UnpackedPtr<BufferDescriptor> unpacked;
-    if (!ConsumedError(ValidateBufferDescriptor(this, desc), &unpacked,
-                       InternalErrorType::OutOfMemory, "calling %s.CreateBuffer(%s).", this,
-                       desc)) {
-        auto* clientErrorInfo = unpacked.Get<DawnBufferDescriptorErrorInfoFromWireClient>();
-        if (clientErrorInfo != nullptr && clientErrorInfo->outOfMemory) {
-            HandleError(DAWN_OUT_OF_MEMORY_ERROR("Failed to allocate memory for buffer mapping"),
-                        InternalErrorType::OutOfMemory);
-        }
-    }
+    [[maybe_unused]] bool invalid =
+        ConsumedError(ValidateBufferDescriptor(this, desc), &unpacked, InternalErrorType::OutOfMemory,
+                      "calling %s.CreateBuffer(%s).", this, desc);
 
     return ReturnToAPI(BufferBase::MakeError(this, desc));
 }

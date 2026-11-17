@@ -73,7 +73,6 @@ TEST_P(NonzeroBufferCreationTests, BufferCreationWithMappedAtCreation) {
     // are done in the Dawn wire and we don't plan to get it work with the toggle
     // "nonzero_clear_resources_on_creation_for_testing" (we will have more tests on it in the
     // BufferZeroInitTests.
-    DAWN_TEST_UNSUPPORTED_IF(UsesWire());
 
     // TODO(crbug.com/473894293): [Capture] validation error: no CopyDst usage.
     DAWN_SUPPRESS_TEST_IF(IsCaptureReplayCheckingEnabled());

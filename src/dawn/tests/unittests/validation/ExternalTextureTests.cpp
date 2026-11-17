@@ -287,7 +287,6 @@ TEST_F(ExternalTextureTest, CreateExternalTextureValidation) {
 }
 
 TEST_F(ExternalTextureTest, CreateExternalTextureConstantValueValidation) {
-    DAWN_SKIP_TEST_IF(UsesWire());
     // Creating a single plane external texture without a YUV-to-RGB matrix should pass.
     {
         wgpu::TextureDescriptor textureDescriptor = CreateTextureDescriptor();

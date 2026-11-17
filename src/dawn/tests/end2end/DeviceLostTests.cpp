@@ -260,7 +260,7 @@ TEST_P(DeviceLostTest, BufferMapAsyncFailsForWriting) {
     LoseDeviceForTesting();
 
     EXPECT_CALL(mMapAsyncCb, Call(wgpu::MapAsyncStatus::Aborted,
-                                  HasSubstr(UsesWire() ? "destroyed before mapping" : "is lost")))
+                                  HasSubstr("is lost")))
         .Times(1);
     buffer.MapAsync(wgpu::MapMode::Write, 0, 4, wgpu::CallbackMode::AllowProcessEvents,
                     mMapAsyncCb.Callback());
@@ -346,7 +346,7 @@ TEST_P(DeviceLostTest, BufferMapAsyncFailsForReading) {
     LoseDeviceForTesting();
 
     EXPECT_CALL(mMapAsyncCb, Call(wgpu::MapAsyncStatus::Aborted,
-                                  HasSubstr(UsesWire() ? "destroyed before mapping" : "is lost")))
+                                  HasSubstr("is lost")))
         .Times(1);
     buffer.MapAsync(wgpu::MapMode::Read, 0, 4, wgpu::CallbackMode::AllowProcessEvents,
                     mMapAsyncCb.Callback());
@@ -486,7 +486,6 @@ TEST_P(DeviceLostTest, LoseDeviceForTestingOnce) {
     LoseDeviceForTesting();
 
     device.ForceLoss(wgpu::DeviceLostReason::Unknown, "Device lost for testing");
-    FlushWire();
     Mock::VerifyAndClearExpectations(&mDeviceLostCallback);
 }
 

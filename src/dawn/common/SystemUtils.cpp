@@ -149,10 +149,6 @@ std::optional<std::string> GetExecutablePath() {
     // UNIMPLEMENTED
     return {};
 }
-#elif DAWN_PLATFORM_IS(EMSCRIPTEN)
-std::optional<std::string> GetExecutablePath() {
-    return {};
-}
 #else
 #error "Implement GetExecutablePath for your platform."
 #endif
@@ -200,10 +196,6 @@ std::optional<std::string> GetModulePath() {
 #endif
 }
 #elif DAWN_PLATFORM_IS(FUCHSIA)
-std::optional<std::string> GetModulePath() {
-    return {};
-}
-#elif DAWN_PLATFORM_IS(EMSCRIPTEN)
 std::optional<std::string> GetModulePath() {
     return {};
 }

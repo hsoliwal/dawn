@@ -86,7 +86,6 @@ class VulkanImageWrappingTestBase : public DawnTestWithParams<ImageWrappingParam
         if (IsSkipped() || HasFatalFailure()) {
             return;
         }
-        DAWN_TEST_UNSUPPORTED_IF(UsesWire());
 
         // TODO(dawn:1552): Nvidia doesn't seem to correctly reflect whether an import requires a
         // dedicated allocation.
@@ -134,10 +133,6 @@ class VulkanImageWrappingTestBase : public DawnTestWithParams<ImageWrappingParam
     }
 
     void TearDown() override {
-        if (UsesWire()) {
-            DawnTestWithParams::TearDown();
-            return;
-        }
 
         defaultTexture = nullptr;
         testTextures = {};
@@ -1095,9 +1090,7 @@ class VulkanImageWrappingMultithreadTests : public VulkanImageWrappingUsageTests
         std::vector<wgpu::FeatureName> features =
             VulkanImageWrappingUsageTests::GetRequiredFeatures();
         // TODO(crbug.com/dawn/1678): DawnWire doesn't support thread safe API yet.
-        if (!UsesWire()) {
-            features.push_back(wgpu::FeatureName::ImplicitDeviceSynchronization);
-        }
+        features.push_back(wgpu::FeatureName::ImplicitDeviceSynchronization);
         return features;
     }
 
@@ -1107,7 +1100,6 @@ class VulkanImageWrappingMultithreadTests : public VulkanImageWrappingUsageTests
             return;
         }
         // TODO(crbug.com/dawn/1678): DawnWire doesn't support thread safe API yet.
-        DAWN_TEST_UNSUPPORTED_IF(UsesWire());
     }
 };
 

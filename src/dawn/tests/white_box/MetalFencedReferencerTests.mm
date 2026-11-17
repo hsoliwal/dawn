@@ -42,7 +42,6 @@ class MetalFencedReferencerTests : public DawnTest {
   protected:
     void SetUp() override {
         DawnTest::SetUp();
-        DAWN_TEST_UNSUPPORTED_IF(UsesWire());
     }
 
     Device* GetMetalDevice() { return ToBackend(FromAPI(device.Get())); }

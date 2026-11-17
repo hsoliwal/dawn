@@ -160,12 +160,10 @@ MATCHER_P(CHandleIs, cType, "") {
 }
 
 #define ASSERT_DEVICE_ERROR_MSG_ON(device, statement, matcher)                                  \
-    FlushWire();                                                                                \
     EXPECT_CALL(mDeviceErrorCallback,                                                           \
                 Call(CHandleIs(device.Get()), testing::Ne(wgpu::ErrorType::NoError), matcher)); \
     statement;                                                                                  \
     instance.ProcessEvents();                                                                   \
-    FlushWire();                                                                                \
     testing::Mock::VerifyAndClearExpectations(&mDeviceErrorCallback);                           \
     do {                                                                                        \
     } while (0)
@@ -180,7 +178,6 @@ MATCHER_P(CHandleIs, cType, "") {
 
 #define EXPECT_DEVICE_LOSS_REASON_MSG_ON(device, reason, statement, matcher)               \
     do {                                                                                   \
-        FlushWire();                                                                       \
         bool deviceLost = false;                                                           \
         EXPECT_CALL(mDeviceLostCallback, Call(CHandleIs(device.Get()), reason, matcher))   \
             .WillOnce([&](const wgpu::Device&, wgpu::DeviceLostReason, wgpu::StringView) { \
@@ -189,7 +186,6 @@ MATCHER_P(CHandleIs, cType, "") {
             .RetiresOnSaturation();                                                        \
         statement;                                                                         \
         instance.ProcessEvents();                                                          \
-        FlushWire();                                                                       \
         EXPECT_TRUE(deviceLost);                                                           \
     } while (0)
 
@@ -215,7 +211,6 @@ struct GLFWindowDestroyer {
 
 namespace utils {
 class PlatformDebugLogger;
-class TerribleCommandBuffer;
 class WireHelper;
 }  // namespace utils
 
@@ -232,12 +227,6 @@ class ExpectBetweenColors;
 template <typename T>
 class ExpectBetweenSnormTextureBounds;
 }  // namespace detail
-
-namespace wire {
-class CommandHandler;
-class WireClient;
-class WireServer;
-}  // namespace wire
 
 namespace replay {
 class Capture;
@@ -259,7 +248,6 @@ class DawnTestEnvironment : public testing::Environment {
     void SetUp() override;
     void TearDown() override;
 
-    bool UsesWire() const;
     bool IsImplicitDeviceSyncEnabled() const;
     bool IsCaptureReplayCheckingEnabled() const;
     native::BackendValidationLevel GetBackendValidationLevel() const;
@@ -271,7 +259,6 @@ class DawnTestEnvironment : public testing::Environment {
     bool HasWebGPUInnerBackendTypeFilter() const;
     wgpu::BackendType GetWebGPUInnerBackendTypeFilter() const;
     bool GetWebGPUInnerForceFallbackAdapter() const;
-    const char* GetWireTraceDir() const;
 
     const std::vector<std::string>& GetEnabledToggles() const;
     const std::vector<std::string>& GetDisabledToggles() const;
@@ -292,7 +279,6 @@ class DawnTestEnvironment : public testing::Environment {
     /// false.
     bool ValidateToggles(native::Instance* instance) const;
 
-    bool mUseWire = false;
     bool mCheckCaptureReplay = false;
     bool mEnableImplicitDeviceSync = false;
     native::BackendValidationLevel mBackendValidationLevel =
@@ -305,7 +291,6 @@ class DawnTestEnvironment : public testing::Environment {
     bool mHasWebGPUInnerBackendTypeFilter = false;
     wgpu::BackendType mWebGPUInnerBackendTypeFilter = wgpu::BackendType::Undefined;
     bool mWebGPUInnerForceFallbackAdapter = false;
-    std::string mWireTraceDir;
     bool mRunSuppressedTests = false;
     bool mIsTestLauncherBotMode = false;
 
@@ -377,7 +362,6 @@ class DawnTestBase {
 
     bool IsMesa(const std::string& mesaVersion = "") const;
 
-    bool UsesWire() const;
     bool IsImplicitDeviceSyncEnabled() const;
     bool IsBackendValidationEnabled() const;
     bool IsFullBackendValidationEnabled() const;
@@ -774,7 +758,6 @@ class DawnTestBase {
                          uint64_t size);
 
     void WaitABit(wgpu::Instance = nullptr);
-    void FlushWire();
     void WaitForAllOperations();
 
     bool SupportsFeatures(const std::vector<wgpu::FeatureName>& features);
@@ -837,8 +820,8 @@ class DawnTestBase {
     // Helps generate unique userdata values passed to deviceLostUserdata.
     std::atomic<uintptr_t> mNextUniqueUserdata = 0;
 
-    // Isolation keys are not exposed to the wire client. Device creation in the tests from
-    // the client first push the key into this queue, which is then consumed by the server.
+    // Device creation in the tests first pushes the isolation key into this queue; device
+    // creation then consumes it.
     std::queue<std::string> mNextIsolationKeyQueue;
 
     // Internal device creation function for default device creation with some optional overrides.
@@ -938,20 +921,16 @@ class DawnTestBase {
         !DawnTestEnvironment::GetEnvironment()->RunSuppressedTests() && condition, "suppressed", \
         condition)
 
-#define EXPECT_DEPRECATION_WARNINGS(statement, n)                             \
-    do {                                                                      \
-        if (UsesWire()) {                                                     \
-            statement;                                                        \
-        } else {                                                              \
-            uint64_t warningsBefore = GetDeprecationWarningCountForTesting(); \
-            statement;                                                        \
-            uint64_t warningsAfter = GetDeprecationWarningCountForTesting();  \
-            EXPECT_EQ(mLastWarningCount, warningsBefore);                     \
-            if (!HasToggleEnabled("skip_validation")) {                       \
-                EXPECT_EQ(warningsAfter, warningsBefore + n);                 \
-            }                                                                 \
-            mLastWarningCount = warningsAfter;                                \
-        }                                                                     \
+#define EXPECT_DEPRECATION_WARNINGS(statement, n)                         \
+    do {                                                                  \
+        uint64_t warningsBefore = GetDeprecationWarningCountForTesting(); \
+        statement;                                                        \
+        uint64_t warningsAfter = GetDeprecationWarningCountForTesting();  \
+        EXPECT_EQ(mLastWarningCount, warningsBefore);                     \
+        if (!HasToggleEnabled("skip_validation")) {                       \
+            EXPECT_EQ(warningsAfter, warningsBefore + n);                 \
+        }                                                                 \
+        mLastWarningCount = warningsAfter;                                \
     } while (0)
 #define EXPECT_DEPRECATION_WARNING(statement) EXPECT_DEPRECATION_WARNINGS(statement, 1)
 

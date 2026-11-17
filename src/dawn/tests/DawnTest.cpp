@@ -67,8 +67,6 @@
 
 #include "absl/cleanup/cleanup.h"
 #include "dawn/dawn_proc.h"
-#include "dawn/wire/WireClient.h"
-#include "dawn/wire/WireServer.h"
 #include "partition_alloc/pointers/raw_ptr.h"
 #include "src/dawn/common/GPUInfo.h"
 #include "src/dawn/common/Math.h"
@@ -80,7 +78,6 @@
 #include "src/dawn/utils/ComboRenderPipelineDescriptor.h"
 #include "src/dawn/utils/PlatformDebugLogger.h"
 #include "src/dawn/utils/SystemUtils.h"
-#include "src/dawn/utils/TerribleCommandBuffer.h"
 #include "src/dawn/utils/TestUtils.h"
 #include "src/dawn/utils/Timer.h"
 #include "src/dawn/utils/WGPUHelpers.h"
@@ -391,11 +388,6 @@ DawnTestEnvironment::~DawnTestEnvironment() = default;
 void DawnTestEnvironment::ParseArgs(int argc, char** argv) {
     size_t argLen = 0;  // Set when parsing --arg=X arguments
     for (int i = 1; i < argc; ++i) {
-        if (strcmp("-w", argv[i]) == 0 || strcmp("--use-wire", argv[i]) == 0) {
-            mUseWire = true;
-            continue;
-        }
-
         if (strcmp("-s", argv[i]) == 0 || strcmp("--enable-implicit-device-sync", argv[i]) == 0) {
             mEnableImplicitDeviceSync = true;
             continue;
@@ -503,13 +495,6 @@ void DawnTestEnvironment::ParseArgs(int argc, char** argv) {
             continue;
         }
 
-        constexpr const char kWireTraceDirArg[] = "--wire-trace-dir=";
-        argLen = sizeof(kWireTraceDirArg) - 1;
-        if (strncmp(argv[i], kWireTraceDirArg, argLen) == 0) {
-            mWireTraceDir = argv[i] + argLen;
-            continue;
-        }
-
         constexpr const char kBackendArg[] = "--backend=";
         argLen = sizeof(kBackendArg) - 1;
         if (strncmp(argv[i], kBackendArg, argLen) == 0) {
@@ -593,7 +578,6 @@ void DawnTestEnvironment::ParseArgs(int argc, char** argv) {
                    "    [--adapter-vendor-id=x] "
                    "[--enable-backend-validation=(full|partial|disabled)]\n"
                    "    [--exclusive-device-type-preference=integrated,cpu,discrete]\n\n"
-                   "  -w, --use-wire: Run the tests through the wire (defaults to no wire)\n"
                    "  -s, --enable-implicit-device-sync: Run the tests with implicit device "
                    "synchronization feature (defaults to false)\n"
                    "  -c, --begin-capture-on-startup: Begin debug capture on startup "
@@ -631,19 +615,6 @@ void DawnTestEnvironment::ParseArgs(int argc, char** argv) {
         WarningLog() << " Unused argument: " << argv[i];
     }
 
-    // TODO(crbug.com/dawn/1678): DawnWire doesn't support thread safe API yet.
-    if (mUseWire && mEnableImplicitDeviceSync) {
-        ErrorLog()
-            << "--use-wire and --enable-implicit-device-sync cannot be used at the same time";
-        DAWN_UNREACHABLE();
-    }
-
-    // TODO(crbug.com/452924800): Remove once these tests work properly with
-    // the WebGPU on WebGPU backend with wire.
-    if (mUseWire && mCheckCaptureReplay) {
-        ErrorLog() << "--use-wire and --check-capture-replay cannot be used at the same time";
-        DAWN_UNREACHABLE();
-    }
 }
 
 std::unique_ptr<native::Instance> DawnTestEnvironment::CreateInstance(
@@ -848,9 +819,6 @@ void DawnTestEnvironment::PrintTestConfigurationAndAdapterInfo(native::Instance*
     LogMessage log = InfoLog();
     log << "Testing configuration\n"
            "---------------------\n"
-           "UseWire: "
-        << (mUseWire ? "true" : "false")
-        << "\n"
            "Implicit device synchronization: "
         << (mEnableImplicitDeviceSync ? "enabled" : "disabled")
         << "\n"
@@ -935,10 +903,6 @@ void DawnTestEnvironment::TearDown() {
     mInstance.reset();
 }
 
-bool DawnTestEnvironment::UsesWire() const {
-    return mUseWire;
-}
-
 bool DawnTestEnvironment::IsImplicitDeviceSyncEnabled() const {
     return mEnableImplicitDeviceSync;
 }
@@ -989,13 +953,6 @@ wgpu::BackendType DawnTestEnvironment::GetWebGPUInnerBackendTypeFilter() const {
 
 bool DawnTestEnvironment::GetWebGPUInnerForceFallbackAdapter() const {
     return mWebGPUInnerForceFallbackAdapter;
-}
-
-const char* DawnTestEnvironment::GetWireTraceDir() const {
-    if (mWireTraceDir.length() == 0) {
-        return nullptr;
-    }
-    return mWireTraceDir.c_str();
 }
 
 const std::vector<std::string>& DawnTestEnvironment::GetEnabledToggles() const {
@@ -1106,8 +1063,7 @@ DawnTestBase::DawnTestBase(const AdapterTestParam& param) : mParam(param) {
         return {0};
     };
 
-    mWireHelper = utils::CreateWireHelper(procs, gTestEnv->UsesWire(), gTestEnv->GetWireTraceDir(),
-                                          mParam.enableSharedMemoryInWire);
+    mWireHelper = utils::CreateWireHelper(procs);
 }
 
 DawnTestBase::~DawnTestBase() {
@@ -1347,10 +1303,6 @@ bool DawnTestBase::IsMesa(const std::string& mesaVersion) const {
 #else
     return false;
 #endif
-}
-
-bool DawnTestBase::UsesWire() const {
-    return gTestEnv->UsesWire();
 }
 
 bool DawnTestBase::IsImplicitDeviceSyncEnabled() const {
@@ -1599,17 +1551,12 @@ WGPUDevice DawnTestBase::CreateDeviceImpl(std::string isolationKey,
     // Check and update the deprecation warning count for creating device.
     // The same as EXPECT_DEPRECATION_WARNINGS, but without checking
     // SkipValidation toggle.
-    if (UsesWire()) {
-        createdDevice = mBackendAdapter.CreateDevice(&deviceDescriptor);
-    } else {
-        uint64_t warningsBefore = GetDeprecationWarningCountForTesting();
-        createdDevice = mBackendAdapter.CreateDevice(&deviceDescriptor);
-        uint64_t warningsAfter = GetDeprecationWarningCountForTesting();
-        EXPECT_EQ(mLastWarningCount, warningsBefore);
-        EXPECT_EQ(warningsAfter, warningsBefore + deviceCreationDeprecatedWarningExpectation);
-        mLastWarningCount = warningsAfter;
-    }
-
+    uint64_t warningsBefore = GetDeprecationWarningCountForTesting();
+    createdDevice = mBackendAdapter.CreateDevice(&deviceDescriptor);
+    uint64_t warningsAfter = GetDeprecationWarningCountForTesting();
+    EXPECT_EQ(mLastWarningCount, warningsBefore);
+    EXPECT_EQ(warningsAfter, warningsBefore + deviceCreationDeprecatedWarningExpectation);
+    mLastWarningCount = warningsAfter;
     return createdDevice;
 }
 
@@ -1684,7 +1631,6 @@ wgpu::Device DawnTestBase::CreateDevice(std::string isolationKey) {
                 GTEST_ASSERT_EQ(mDeviceLostCallbackFailedCreationCalledCount, 1u);
             }
         });
-    FlushWire();
 
     return apiDevice;
 }
@@ -1753,25 +1699,7 @@ void DawnTestBase::SetUp() {
     mTestPlatform = CreateTestPlatform();
     gTestEnv->GetInstance()->SetPlatformForTesting(mTestPlatform.get());
 
-    // By default we enable all the WGSL language features (including experimental, testing and
-    // unsafe ones) in the tests.
-    WGPUInstanceDescriptor instanceDesc = {};
-    std::vector<WGPUInstanceFeatureName> features = {WGPUInstanceFeatureName_TimedWaitAny};
-    instanceDesc.requiredFeatureCount = features.size();
-    instanceDesc.requiredFeatures = features.data();
-    WGPUDawnWireWGSLControl wgslControl;
-    wgslControl.chain.sType = WGPUSType_DawnWireWGSLControl;
-    wgslControl.enableExperimental = 1u;
-    wgslControl.enableTesting = 1u;
-    wgslControl.enableUnsafe = 1u;
-    instanceDesc.nextInChain = &wgslControl.chain;
-    wgslControl.chain.next = nullptr;
-    instance = mWireHelper->RegisterInstance(gTestEnv->GetInstance()->Get(), &instanceDesc);
-
-    std::string traceName =
-        std::string(::testing::UnitTest::GetInstance()->current_test_info()->test_suite_name()) +
-        "_" + ::testing::UnitTest::GetInstance()->current_test_info()->name();
-    mWireHelper->BeginWireTrace(traceName.c_str());
+    instance = mWireHelper->RegisterInstance(gTestEnv->GetInstance()->Get());
 
     // RequestAdapter is overridden to ignore RequestAdapterOptions, and select based on test
     // params.
@@ -1780,7 +1708,6 @@ void DawnTestBase::SetUp() {
         [](wgpu::RequestAdapterStatus status, wgpu::Adapter result, wgpu::StringView message,
            wgpu::Adapter* userdata) -> void { *userdata = std::move(result); },
         &adapter);
-    FlushWire();
     DAWN_ASSERT(adapter);
     mRequireUseTieredLimits = GetRequireUseTieredLimits();
     if (mRequireUseTieredLimits) {
@@ -1820,10 +1747,7 @@ void DawnTestBase::TearDown() {
     if (mRequireUseTieredLimits) {
         mBackendAdapter.SetUseTieredLimits(false);
     }
-    if (!UsesWire()) {
-        EXPECT_EQ(mLastWarningCount, GetDeprecationWarningCountForTesting());
-    }
-
+    EXPECT_EQ(mLastWarningCount, GetDeprecationWarningCountForTesting());
     if (mExpectedTimeMaxSec != 0.0f) {
         float real_time_taken = mTimer->GetElapsedTime();
         EXPECT_GE(mExpectedTimeMaxSec, real_time_taken);
@@ -1858,7 +1782,6 @@ void DawnTestBase::LoseDeviceForTesting(wgpu::Device deviceToLose) {
         .Times(1);
     resolvedDevice.ForceLoss(wgpu::DeviceLostReason::Unknown, "Device lost for testing");
     resolvedDevice.Tick();
-    FlushWire();
 }
 
 std::ostringstream& DawnTestBase::AddBufferExpectation(const char* file,
@@ -2252,29 +2175,16 @@ void DawnTestBase::MapAsyncAndWait(const wgpu::Buffer& buffer,
                                    uint64_t size) {
     DAWN_ASSERT(mapMode == wgpu::MapMode::Read || mapMode == wgpu::MapMode::Write);
 
-    if (!UsesWire()) {
-        // We use a new mock callback here so that the validation on the call happens as soon as the
-        // scope of this call ends.
-        MockCppCallback<void (*)(wgpu::MapAsyncStatus, wgpu::StringView)> mockCb;
-        EXPECT_CALL(mockCb, Call(wgpu::MapAsyncStatus::Success, _)).Times(1);
+    // We use a new mock callback here so that the validation on the call happens as soon as the
+    // scope of this call ends.
+    MockCppCallback<void (*)(wgpu::MapAsyncStatus, wgpu::StringView)> mockCb;
+    EXPECT_CALL(mockCb, Call(wgpu::MapAsyncStatus::Success, _)).Times(1);
 
-        ASSERT_EQ(
-            instance.WaitAny(buffer.MapAsync(mapMode, offset, size, wgpu::CallbackMode::WaitAnyOnly,
-                                             mockCb.Callback()),
-                             UINT64_MAX),
-            wgpu::WaitStatus::Success);
-    } else {
-        bool done = false;
-        buffer.MapAsync(mapMode, offset, size, wgpu::CallbackMode::AllowProcessEvents,
-                        [&done](wgpu::MapAsyncStatus status, wgpu::StringView) {
-                            ASSERT_EQ(status, wgpu::MapAsyncStatus::Success);
-                            done = true;
-                        });
-
-        while (!done) {
-            WaitABit();
-        }
-    }
+    ASSERT_EQ(
+        instance.WaitAny(buffer.MapAsync(mapMode, offset, size, wgpu::CallbackMode::WaitAnyOnly,
+                                         mockCb.Callback()),
+                         UINT64_MAX),
+        wgpu::WaitStatus::Success);
 }
 
 void DawnTestBase::WaitABit(wgpu::Instance targetInstance) {
@@ -2284,16 +2194,8 @@ void DawnTestBase::WaitABit(wgpu::Instance targetInstance) {
     if (targetInstance != nullptr) {
         targetInstance.ProcessEvents();
     }
-    FlushWire();
 
     utils::USleep(100);
-}
-
-void DawnTestBase::FlushWire() {
-    if (gTestEnv->UsesWire()) {
-        bool C2SFlushed = mWireHelper->FlushClient();
-        DAWN_ASSERT(C2SFlushed);
-    }
 }
 
 void DawnTestBase::WaitForAllOperations() {
@@ -2517,7 +2419,6 @@ void DawnTestBase::StartTestTimer(float expected_max_time) {
 }
 
 void DawnTestBase::ResolveDeferredExpectationsNow() {
-    FlushWire();
 
     Mutex::AutoLock lg(&mMutex);
     MapSlotsSynchronously(mReadbackSlots);

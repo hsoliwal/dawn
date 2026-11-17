@@ -56,7 +56,6 @@ class SurfaceTests : public DawnTest {
   public:
     void SetUp() override {
         DawnTest::SetUp();
-        DAWN_TEST_UNSUPPORTED_IF(UsesWire());
 
         // TODO(crbug.com/dawn/2531): Failing on newer Linux/Intel driver version.
         // However, IsIntel() and IsMesa() don't work with the null backend.

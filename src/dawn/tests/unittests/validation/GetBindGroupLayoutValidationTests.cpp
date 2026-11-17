@@ -58,7 +58,6 @@ class GetBindGroupLayoutTests : public ValidationTest {
 // Test that GetBindGroupLayout returns the same object for the same index
 // and for matching layouts.
 TEST_F(GetBindGroupLayoutTests, EquivalentBGLs) {
-    DAWN_SKIP_TEST_IF(UsesWire());
 
     wgpu::ShaderModule vsModule = utils::CreateShaderModule(device, R"(
         struct S {
@@ -216,7 +215,6 @@ TEST_F(GetBindGroupLayoutTests, DefaultBindGroupLayoutSamePipelines) {
 // - shader stage visibility is the stage that adds the binding.
 // - dynamic offsets is false
 TEST_F(GetBindGroupLayoutTests, DefaultShaderStageAndDynamicOffsets) {
-    DAWN_SKIP_TEST_IF(UsesWire());
 
     wgpu::RenderPipeline pipeline = RenderPipelineFromFragmentShader(R"(
         struct S {
@@ -264,7 +262,6 @@ TEST_F(GetBindGroupLayoutTests, DefaultShaderStageAndDynamicOffsets) {
 }
 
 TEST_F(GetBindGroupLayoutTests, DefaultTextureSampleType) {
-    DAWN_SKIP_TEST_IF(UsesWire());
 
     wgpu::BindGroupLayout filteringBGL = utils::MakeBindGroupLayout(
         device, {{0, wgpu::ShaderStage::Vertex | wgpu::ShaderStage::Fragment,
@@ -388,7 +385,6 @@ TEST_F(GetBindGroupLayoutTests, DefaultTextureSampleType) {
 
 // Test GetBindGroupLayout works with a compute pipeline
 TEST_F(GetBindGroupLayoutTests, ComputePipeline) {
-    DAWN_SKIP_TEST_IF(UsesWire());
 
     wgpu::ShaderModule csModule = utils::CreateShaderModule(device, R"(
         struct S {
@@ -426,7 +422,6 @@ TEST_F(GetBindGroupLayoutTests, ComputePipeline) {
 
 // Test that the binding type matches the shader.
 TEST_F(GetBindGroupLayoutTests, BindingType) {
-    DAWN_SKIP_TEST_IF(UsesWire());
 
     wgpu::BindGroupLayoutEntry binding = {};
     binding.binding = 0;
@@ -527,7 +522,6 @@ TEST_F(GetBindGroupLayoutTests, BindingType) {
 // Tests that the external texture binding type matches with a texture_external declared in the
 // shader.
 TEST_F(GetBindGroupLayoutTests, ExternalTextureBindingType) {
-    DAWN_SKIP_TEST_IF(UsesWire());
 
     wgpu::BindGroupLayoutEntry binding = {};
     binding.binding = 0;
@@ -550,7 +544,6 @@ TEST_F(GetBindGroupLayoutTests, ExternalTextureBindingType) {
 
 // Tests that the texel buffer binding type matches with a texel_buffer declared in the shader.
 TEST_F(GetBindGroupLayoutTests, TexelBufferBindingType) {
-    DAWN_SKIP_TEST_IF(UsesWire());
 
     wgpu::TexelBufferBindingLayout layout = {};
     layout.access = wgpu::TexelBufferAccess::ReadOnly;
@@ -579,7 +572,6 @@ TEST_F(GetBindGroupLayoutTests, TexelBufferBindingType) {
 
 // Test that texture view dimension matches the shader.
 TEST_F(GetBindGroupLayoutTests, TextureViewDimension) {
-    DAWN_SKIP_TEST_IF(UsesWire());
 
     wgpu::BindGroupLayoutEntry binding = {};
     binding.binding = 0;
@@ -670,7 +662,6 @@ TEST_F(GetBindGroupLayoutTests, TextureViewDimension) {
 
 // Test that storageTexture view dimension matches the shader.
 TEST_F(GetBindGroupLayoutTests, StorageTextureViewDimension) {
-    DAWN_SKIP_TEST_IF(UsesWire());
 
     wgpu::BindGroupLayoutEntry binding = {};
     binding.binding = 0;
@@ -738,7 +729,6 @@ TEST_F(GetBindGroupLayoutTests, StorageTextureViewDimension) {
 
 // Test that texture component type matches the shader.
 TEST_F(GetBindGroupLayoutTests, TextureComponentType) {
-    DAWN_SKIP_TEST_IF(UsesWire());
 
     wgpu::BindGroupLayoutEntry binding = {};
     binding.binding = 0;
@@ -787,7 +777,6 @@ TEST_F(GetBindGroupLayoutTests, TextureComponentType) {
 
 // Test that binding= indices match.
 TEST_F(GetBindGroupLayoutTests, BindingIndices) {
-    DAWN_SKIP_TEST_IF(UsesWire());
 
     wgpu::BindGroupLayoutEntry binding = {};
     binding.visibility = wgpu::ShaderStage::Fragment;
@@ -881,7 +870,6 @@ TEST_F(GetBindGroupLayoutTests, DuplicateBinding) {
 
 // Test that minBufferSize is set on the BGL and that the max of the min buffer sizes is used.
 TEST_F(GetBindGroupLayoutTests, MinBufferSize) {
-    DAWN_SKIP_TEST_IF(UsesWire());
 
     wgpu::ShaderModule vsModule4 = utils::CreateShaderModule(device, R"(
         struct S {
@@ -971,7 +959,6 @@ TEST_F(GetBindGroupLayoutTests, MinBufferSize) {
 
 // Test that the visibility is correctly aggregated if two stages have the exact same binding.
 TEST_F(GetBindGroupLayoutTests, StageAggregation) {
-    DAWN_SKIP_TEST_IF(UsesWire());
 
     wgpu::ShaderModule vsModuleNoSampler = utils::CreateShaderModule(device, R"(
         @vertex fn main() -> @builtin(position) vec4f {
@@ -1044,7 +1031,6 @@ TEST_F(GetBindGroupLayoutTests, StageAggregation) {
 
 // Test that a binding_array is reflected into a BGLEntry with an arraySize.
 TEST_F(GetBindGroupLayoutTests, ArraySizeReflected) {
-    DAWN_SKIP_TEST_IF(UsesWire());
 
     wgpu::BindGroupLayoutEntry entry;
     entry.binding = 0;
@@ -1075,7 +1061,6 @@ TEST_F(GetBindGroupLayoutTests, ArraySizeReflected) {
 
 // Test that a binding_array is reflected into an entry with the max of both sizes
 TEST_F(GetBindGroupLayoutTests, ArraySizeTwoStages) {
-    DAWN_SKIP_TEST_IF(UsesWire());
 
     // A BGL with arraySize = 3
     wgpu::BindGroupLayoutEntry entry;
@@ -1284,7 +1269,6 @@ TEST_F(GetBindGroupLayoutTests, OutOfRangeIndex) {
 // Test that unused indices return the empty bind group layout if less than the maximum number of
 // bind groups, an error otherwise.
 TEST_F(GetBindGroupLayoutTests, UnusedIndex) {
-    DAWN_SKIP_TEST_IF(UsesWire());
 
     wgpu::RenderPipeline pipeline = RenderPipelineFromFragmentShader(R"(
         struct S {
@@ -1320,7 +1304,6 @@ TEST_F(GetBindGroupLayoutTests, UnusedIndex) {
 // Test that after explicitly creating a pipeline with a pipeline layout, calling
 // GetBindGroupLayout reflects the same bind group layouts.
 TEST_F(GetBindGroupLayoutTests, Reflection) {
-    DAWN_SKIP_TEST_IF(UsesWire());
 
     wgpu::BindGroupLayoutEntry binding = {};
     binding.binding = 0;
@@ -1412,7 +1395,6 @@ TEST_F(GetBindGroupLayoutTests, FromCorrectEntryPoint) {
 
 // Test that a pipeline full of explicitly empty BGLs correctly reflects them.
 TEST_F(GetBindGroupLayoutTests, FullOfEmptyBGLs) {
-    DAWN_SKIP_TEST_IF(UsesWire());
 
     wgpu::BindGroupLayout emptyBGL = utils::MakeBindGroupLayout(device, {});
     wgpu::PipelineLayout pl =
@@ -1434,7 +1416,6 @@ TEST_F(GetBindGroupLayoutTests, FullOfEmptyBGLs) {
 
 // Test that a pipeline full of explicitly null BGLs correctly reflects empty BGLs.
 TEST_F(GetBindGroupLayoutTests, NullBGLs) {
-    DAWN_SKIP_TEST_IF(UsesWire());
 
     wgpu::PipelineLayout pl =
         utils::MakePipelineLayout(device, {nullptr, nullptr, nullptr, nullptr});
@@ -1457,7 +1438,6 @@ TEST_F(GetBindGroupLayoutTests, NullBGLs) {
 // Regression test for a revert where the default layout computation of a sampler used with an
 // external texture would mark it unfilterable (when it needs to be filterable).
 TEST_F(GetBindGroupLayoutTests, SamplerUsedWithExternalTexture) {
-    DAWN_SKIP_TEST_IF(UsesWire());
 
     wgpu::ShaderModule module = utils::CreateShaderModule(device, R"(
         @vertex fn vs() -> @builtin(position) vec4f {
