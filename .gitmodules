@@ -1,61 +1,48 @@
 [submodule "third_party/googletest/src"]
 	path = third_party/googletest/src
 	url = https://chromium.googlesource.com/external/github.com/google/googletest
-	gclient-condition = dawn_standalone
 [submodule "third_party/google_benchmark/src"]
 	path = third_party/google_benchmark/src
 	url = https://chromium.googlesource.com/external/github.com/google/benchmark.git
-	gclient-condition = dawn_standalone
 [submodule "third_party/jinja2"]
 	path = third_party/jinja2
 	url = https://chromium.googlesource.com/chromium/src/third_party/jinja2
-	gclient-condition = dawn_standalone
 [submodule "third_party/markupsafe"]
 	path = third_party/markupsafe
 	url = https://chromium.googlesource.com/chromium/src/third_party/markupsafe
-	gclient-condition = dawn_standalone
 [submodule "third_party/glfw3/src"]
 	path = third_party/glfw3/src
 	url = https://chromium.googlesource.com/external/github.com/glfw/glfw
 [submodule "third_party/swiftshader"]
 	path = third_party/swiftshader
 	url = https://swiftshader.googlesource.com/SwiftShader
-	gclient-condition = dawn_standalone
 [submodule "third_party/glslang/src"]
 	path = third_party/glslang/src
 	url = https://chromium.googlesource.com/external/github.com/KhronosGroup/glslang
-	gclient-condition = dawn_standalone
 [submodule "third_party/spirv-headers/src"]
 	path = third_party/spirv-headers/src
 	url = https://chromium.googlesource.com/external/github.com/KhronosGroup/SPIRV-Headers
-	gclient-condition = dawn_standalone
 [submodule "third_party/spirv-tools/src"]
 	path = third_party/spirv-tools/src
 	url = https://chromium.googlesource.com/external/github.com/KhronosGroup/SPIRV-Tools
-	gclient-condition = dawn_standalone
 [submodule "third_party/vulkan-headers/src"]
 	path = third_party/vulkan-headers/src
 	url = https://chromium.googlesource.com/external/github.com/KhronosGroup/Vulkan-Headers
-	gclient-condition = dawn_standalone
 [submodule "third_party/vulkan-loader/src"]
 	path = third_party/vulkan-loader/src
 	url = https://chromium.googlesource.com/external/github.com/KhronosGroup/Vulkan-Loader
-	gclient-condition = dawn_standalone
 [submodule "third_party/vulkan-utility-libraries/src"]
 	path = third_party/vulkan-utility-libraries/src
 	url = https://chromium.googlesource.com/external/github.com/KhronosGroup/Vulkan-Utility-Libraries
-	gclient-condition = dawn_standalone
 [submodule "third_party/abseil-cpp"]
 	path = third_party/abseil-cpp
 	url = https://chromium.googlesource.com/chromium/src/third_party/abseil-cpp
-	gclient-condition = dawn_standalone
 [submodule "third_party/directx-shader-compiler/src"]
 	path = third_party/directx-shader-compiler/src
 	url = https://chromium.googlesource.com/external/github.com/microsoft/DirectXShaderCompiler
 [submodule "third_party/directx-headers/src"]
 	path = third_party/directx-headers/src
 	url = https://chromium.googlesource.com/external/github.com/microsoft/DirectX-Headers
-	gclient-condition = host_os != "win"
 [submodule "third_party/OpenGL-Registry/src"]
 	path = third_party/OpenGL-Registry/src
 	url = https://chromium.googlesource.com/external/github.com/KhronosGroup/OpenGL-Registry
@@ -68,12 +55,9 @@
 [submodule "third_party/protobuf"]
 	path = third_party/protobuf
 	url = https://chromium.googlesource.com/chromium/src/third_party/protobuf
-	gclient-condition = dawn_standalone
 [submodule "third_party/libprotobuf-mutator/src"]
 	path = third_party/libprotobuf-mutator/src
 	url = https://chromium.googlesource.com/external/github.com/google/libprotobuf-mutator.git
-	gclient-condition = dawn_standalone
 [submodule "third_party/mesa/src"]
 	path = third_party/mesa/src
 	url = https://chromium.googlesource.com/external/gitlab.freedesktop.org/mesa/mesa/
-	gclient-condition = checkout_mesa and host_os == "linux"
