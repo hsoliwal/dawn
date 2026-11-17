@@ -18,15 +18,14 @@ Choose a route:
 
 | Component | Job | Source |
 | --- | --- | --- |
-| API model and generators | Describe the API and produce headers, wrappers, proc tables, and wire code | [dawn.json](../src/dawn/dawn.json), [generator](../generator) |
+| API model and generators | Describe the API and produce headers, wrappers, proc tables, and native dispatch code | [dawn.json](../src/dawn/dawn.json), [generator](../generator) |
 | Dawn Native frontend | Shared API validation and state tracking | [src/dawn/native](../src/dawn/native) |
 | Native backends | Translate work to platform GPU APIs | Backend subdirectories under native |
-| Dawn Wire | Serialize client commands and dispatch them on the server; return callbacks | [src/dawn/wire](../src/dawn/wire) |
 | Dawn Proc | Dispatch through a function table to a selected implementation | [Overview: Dawn Proc](dawn/overview.md#dawn-proc-dawn_proc) |
 | Tint | Translate WGSL into shader forms used by native backends | [src/tint](../src/tint) |
 | Tests and samples | Exercise internal behavior, validation, GPU execution, and examples | [src/dawn/tests](../src/dawn/tests), [samples](../src/dawn/samples) |
 
-A useful mental model is application -> WebGPU API -> native frontend -> selected backend -> driver/GPU. A wire client/server boundary may sit before the native implementation. Tint supplies shader translation within this larger path. These are responsibilities, not a literal stack trace for every call.
+A useful mental model is application -> WebGPU API -> native frontend -> selected backend -> driver/GPU. This fork removed the Chromium wire/client-server layer; Tint still supplies shader translation within the native path. These are responsibilities, not a literal stack trace for every call.
 
 Some headers and implementations are generated. If a header is missing from a source-only checkout, read [code generation](dawn/codegen.md) and the build rules before assuming it was deleted.
 
@@ -34,7 +33,7 @@ Some headers and implementations are generated. If a header is missing from a so
 
 The checked-out [CMakeLists.txt](../CMakeLists.txt) requires **CMake 3.22 or later**. Prefer the build-system requirement if prose from another revision disagrees.
 
-The [build guide](building.md) also specifies Git, Python 3, Go 1.23+, a C++20 compiler, and Ninja 1.12 or an alternative CMake-supported build tool. GN development uses depot_tools; platform SDKs, compiler versions, and Linux packages are detailed in that guide. Node.js/npm are needed for `dawn.node`, not for every native use.
+The [build guide](building.md) also specifies Git, Python 3, Go 1.23+, a C++20 compiler, and Ninja 1.12 or an alternative CMake-supported build tool. This fork uses native CMake; Chromium GN and `dawn.node` were removed. Platform SDKs, compiler versions, and Linux packages are detailed in that guide. Node.js/npm are not required for the native Dawn library.
 
 Dependency fetching uses network access and can download substantial toolchains. Read the build guide's dependency license notice, including Direct3D WARP, before fetching. This guide does not accept those terms for you.
 
