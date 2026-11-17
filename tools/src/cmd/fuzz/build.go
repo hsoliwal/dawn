@@ -43,10 +43,10 @@ func (t *taskConfig) buildTargets(targets []string) error {
 	return nil
 }
 
-// syncAndBuildTargets runs gclient sync and then builds a list of ninja targets.
+// syncAndBuildTargets updates the pinned submodules and then builds a list of ninja targets.
 func (t *taskConfig) syncAndBuildTargets(targets []string) error {
-	if _, err := t.runCmd("gclient", "sync"); err != nil {
-		return fmt.Errorf("gclient sync failed: %w", err)
+	if _, err := t.runCmd("git", "submodule", "update", "--init"); err != nil {
+		return fmt.Errorf("git submodule update failed: %w", err)
 	}
 
 	return t.buildTargets(targets)

@@ -1,0 +1,45 @@
+name: Native source boundary
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  native-only:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - name: Reject browser, Node, wire, and GN source reintroduction
+        shell: bash
+        run: |
+          set -euo pipefail
+          removed_paths=(
+            src/emdawnwebgpu third_party/emdawnwebgpu
+            src/dawn/node src/dawn/wire include/dawn/wire
+            webgpu-cts third_party/webgpu-cts scripts/dawn_node_cts
+            build_overrides infra
+          )
+          for path in "${removed_paths[@]}"; do
+            if test -n "$(git ls-files -- "$path")"; then
+              echo "Removed browser/Chromium source returned: $path" >&2
+              exit 1
+            fi
+          done
+          if git ls-files | grep -E '(^|/)BUILD\.gn$|\.gni$|(^|/)\.gn$'; then
+            echo 'Removed Chromium GN build files returned' >&2
+            exit 1
+          fi
+      - name: Preserve native CMake build and Emscripten refusal
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f src/dawn/native/CMakeLists.txt
+          test -f src/tint/CMakeLists.txt
+          grep -qF 'Browser builds (Emscripten, emdawnwebgpu) were removed from this fork' CMakeLists.txt

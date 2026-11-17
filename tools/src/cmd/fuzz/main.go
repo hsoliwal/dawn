@@ -552,7 +552,7 @@ func (t *taskConfig) atGitHash(hash string, fn func() error) error {
 	defer func() {
 		fmt.Printf("Restoring repository to original state (%s)...\n", origRef)
 		_, _ = t.runCmd("git", "checkout", origRef)
-		_, _ = t.runCmd("gclient", "sync")
+		_, _ = t.runCmd("git", "submodule", "update", "--init")
 	}()
 
 	fmt.Printf("Syncing repository to hash %s...\n", hash)

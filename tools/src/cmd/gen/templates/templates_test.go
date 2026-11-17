@@ -28,11 +28,11 @@ func setupRunFileTest(t *testing.T) (oswrapper.FSTestOSWrapper, *common.Config, 
 		OsWrapper: osw,
 	}
 
-	// Populate mock FS with DEPS at realDawnRoot so DawnRoot(osw) works.
+	// Populate mock FS with go.mod at realDawnRoot so DawnRoot(osw) works.
 	err := osw.MkdirAll(realDawnRoot, 0755)
 	require.NoError(t, err, "Failed to create root in mock FS")
-	err = osw.WriteFile(filepath.Join(realDawnRoot, "DEPS"), []byte(""), 0644)
-	require.NoError(t, err, "Failed to write DEPS")
+	err = osw.WriteFile(filepath.Join(realDawnRoot, "go.mod"), []byte(""), 0644)
+	require.NoError(t, err, "Failed to write go.mod")
 
 	// Create the directory structure corresponding to ThisDir() to ensure path lookup works.
 	thisDir := fileutils.ThisDir()

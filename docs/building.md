@@ -69,7 +69,8 @@ Use `python tools/fetch_dawn_dependencies.py -h` to know more about the availabl
 does not figure out option-dependent requirements automatically.
 
 On Windows, configuring CMake with both `DAWN_FETCH_DEPENDENCIES=ON` and
-`DAWN_USE_AGILITY_SDK=ON` downloads the Agility SDK version pinned in `DEPS`.
+`DAWN_USE_AGILITY_SDK=ON` downloads the Agility SDK version pinned in
+`tools/fetch_dawn_dependencies.py`.
 
 ### Linux dependencies
 
