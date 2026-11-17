@@ -14,7 +14,7 @@ that you always get the right dependencies and compilers.
 
 ```shell
 # Change to the directory where you want to create the code repository
-$ git clone https://dawn.googlesource.com/dawn
+$ git clone https://github.com/hsoliwal/dawn.git
 Cloning into 'dawn'...
 ```
 

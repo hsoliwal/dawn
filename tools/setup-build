@@ -134,8 +134,11 @@ for arg in "$@"; do
     "--verbose" | "-v")
       VERBOSE=1
     ;;
+    "remoteexec")
+      show_usage "remoteexec requires the removed Chromium build tooling; use local CMake compilation"
+    ;;
     "local")
-      : # Local compilation is the only supported mode.
+      # Kept as a no-op for existing native build commands.
     ;;
     "shared")
       SHARED=1

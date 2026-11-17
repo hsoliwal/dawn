@@ -37,90 +37,42 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestCheckGnArgs(t *testing.T) {
+func TestCheckCMakeArgs(t *testing.T) {
+	baseline := "TINT_BUILD_FUZZERS:BOOL=ON\nTINT_BUILD_WGSL_READER:BOOL=TRUE\nDAWN_EMIT_COVERAGE:BOOL=1\n"
 	tests := []struct {
-		name    string
-		gnJson  string
-		fuzzers []string
-		wantErr bool
+		name           string
+		cache          string
+		fuzzers        []string
+		wantErr        string
+		wantSanitizers bool
 	}{
-		{
-			name: "Correct baseline flags",
-			gnJson: `[
-				{"name": "use_libfuzzer", "current": {"value": "true"}},
-				{"name": "tint_build_wgsl_reader", "current": {"value": "true"}},
-				{"name": "use_clang_coverage", "current": {"value": "true"}},
-				{"name": "optimize_for_fuzzing", "current": {"value": "false"}}
-			]`,
-			fuzzers: []string{"tint_wgsl_fuzzer"},
-			wantErr: false,
-		},
-		{
-			name: "Missing use_clang_coverage",
-			gnJson: `[
-				{"name": "use_libfuzzer", "current": {"value": "true"}},
-				{"name": "tint_build_wgsl_reader", "current": {"value": "true"}},
-				{"name": "optimize_for_fuzzing", "current": {"value": "false"}}
-			]`,
-			fuzzers: []string{"tint_wgsl_fuzzer"},
-			wantErr: true,
-		},
-		{
-			name: "optimize_for_fuzzing is true",
-			gnJson: `[
-				{"name": "use_libfuzzer", "current": {"value": "true"}},
-				{"name": "tint_build_wgsl_reader", "current": {"value": "true"}},
-				{"name": "use_clang_coverage", "current": {"value": "true"}},
-				{"name": "optimize_for_fuzzing", "current": {"value": "true"}}
-			]`,
-			fuzzers: []string{"tint_wgsl_fuzzer"},
-			wantErr: true,
-		},
-		{
-			name: "Correct IR flags",
-			gnJson: `[
-				{"name": "use_libfuzzer", "current": {"value": "true"}},
-				{"name": "tint_build_wgsl_reader", "current": {"value": "true"}},
-				{"name": "use_clang_coverage", "current": {"value": "true"}},
-				{"name": "optimize_for_fuzzing", "current": {"value": "false"}},
-				{"name": "tint_build_ir_binary", "current": {"value": "true"}},
-				{"name": "tint_has_protobuf", "current": {"value": "true"}}
-			]`,
-			fuzzers: []string{"tint_ir_fuzzer"},
-			wantErr: false,
-		},
-		{
-			name: "Missing IR protobuf flag",
-			gnJson: `[
-				{"name": "use_libfuzzer", "current": {"value": "true"}},
-				{"name": "tint_build_wgsl_reader", "current": {"value": "true"}},
-				{"name": "use_clang_coverage", "current": {"value": "true"}},
-				{"name": "optimize_for_fuzzing", "current": {"value": "false"}},
-				{"name": "tint_build_ir_binary", "current": {"value": "true"}}
-			]`,
-			fuzzers: []string{"tint_ir_fuzzer"},
-			wantErr: true,
-		},
+		{name: "Native WGSL baseline", cache: baseline, fuzzers: []string{"tint_wgsl_fuzzer"}},
+		{name: "Coverage disabled", cache: baseline + "DAWN_EMIT_COVERAGE:BOOL=OFF\n", fuzzers: []string{"tint_wgsl_fuzzer"}, wantErr: "DAWN_EMIT_COVERAGE"},
+		{name: "Missing IR dependencies", cache: baseline, fuzzers: []string{"tint_ir_fuzzer"}, wantErr: "DAWN_BUILD_PROTOBUF"},
+		{name: "Native IR", cache: baseline + "TINT_BUILD_IR_BINARY:BOOL=YES\nDAWN_BUILD_PROTOBUF:BOOL=ON\n", fuzzers: []string{"tint_ir_fuzzer"}},
+		{name: "Native Mesa", cache: baseline + "TINT_BUILD_MESA:BOOL=ON\nTINT_BUILD_FUZZER_VULKAN_SUPPORT:BOOL=ON\n", fuzzers: []string{"tint_wgsl_mesa_fuzzer"}},
+		{name: "Missing Mesa support", cache: baseline, fuzzers: []string{"tint_wgsl_mesa_fuzzer"}, wantErr: "TINT_BUILD_MESA"},
+		{name: "Sanitizers", cache: baseline + "DAWN_ENABLE_ASAN:BOOL=TRUE\n", fuzzers: []string{"tint_wgsl_fuzzer"}, wantSanitizers: true},
+		{name: "Compiler sanitizer flags", cache: baseline + "CMAKE_CXX_FLAGS:STRING=-O2 -fsanitize=undefined,address\n", fuzzers: []string{"tint_wgsl_fuzzer"}, wantSanitizers: true},
+		{name: "Active configuration sanitizer flags", cache: baseline + "CMAKE_BUILD_TYPE:STRING=Release\nCMAKE_C_FLAGS_RELEASE:STRING=-fsanitize=thread\n", fuzzers: []string{"tint_wgsl_fuzzer"}, wantSanitizers: true},
+		{name: "Inactive sanitizer configuration", cache: baseline + "CMAKE_BUILD_TYPE:STRING=Release\nCMAKE_CXX_FLAGS_DEBUG:STRING=-fsanitize=memory\n", fuzzers: []string{"tint_wgsl_fuzzer"}},
+		{name: "Multiple configurations", cache: baseline + "CMAKE_CONFIGURATION_TYPES:STRING=Debug;Release\n", fuzzers: []string{"tint_wgsl_fuzzer"}, wantErr: "single-configuration"},
+		{name: "Numeric boolean", cache: baseline + "DAWN_EMIT_COVERAGE:BOOL=2\n", fuzzers: []string{"tint_wgsl_fuzzer"}},
+		{name: "Shared experiment build", cache: baseline + "BUILD_SHARED_LIBS:BOOL=ON\n", fuzzers: []string{"tint_wgsl_fuzzer"}, wantErr: "BUILD_SHARED_LIBS=OFF"},
+		{name: "Unknown fuzzer", cache: baseline, fuzzers: []string{"unknown"}, wantErr: "unknown fuzzer"},
 	}
-
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			fs := oswrapper.CreateFSTestOSWrapper()
-			ew := execwrapper.NewTestExecWrapperForSuccess([]byte(tc.gnJson), nil)
-
-			cfg := &taskConfig{
-				mainConfig: mainConfig{
-					build:       "/build",
-					osWrapper:   fs,
-					execWrapper: ew,
-				},
-			}
-
-			_, err := checkGnArgs(cfg, tc.fuzzers)
-			if tc.wantErr {
-				require.Error(t, err)
+			require.NoError(t, fs.MkdirAll("/build", 0755))
+			require.NoError(t, fs.WriteFile("/build/CMakeCache.txt", []byte(tc.cache), 0644))
+			cfg := &taskConfig{mainConfig: mainConfig{build: "/build", osWrapper: fs}}
+			sanitizers, err := checkCMakeArgs(cfg, tc.fuzzers)
+			if tc.wantErr != "" {
+				require.ErrorContains(t, err, tc.wantErr)
 			} else {
 				require.NoError(t, err)
+				require.Equal(t, tc.wantSanitizers, sanitizers)
 			}
 		})
 	}
@@ -452,10 +404,14 @@ func TestPrepareBinariesWithRuntimeDeps(t *testing.T) {
 	_ = fs.MkdirAll("/build", 0755)
 	_ = fs.WriteFile("/build/tint_wgsl_fuzzer", []byte("fuzzer-binary"), 0755)
 
+	// Keep the native compiler and source root in the CMake cache.
+	require.NoError(t, fs.WriteFile("/build/CMakeCache.txt", []byte(
+		"CMAKE_HOME_DIRECTORY:INTERNAL=/source\nCMAKE_CXX_COMPILER:FILEPATH=/toolchain/bin/clang++\n"), 0644))
+
 	// Create mock LLVM tools
-	_ = fs.MkdirAll("third_party/llvm-build/Release+Asserts/bin", 0755)
-	_ = fs.WriteFile("third_party/llvm-build/Release+Asserts/bin/llvm-profdata", []byte("mock-profdata"), 0755)
-	_ = fs.WriteFile("third_party/llvm-build/Release+Asserts/bin/llvm-cov", []byte("mock-cov"), 0755)
+	_ = fs.MkdirAll("/toolchain/bin", 0755)
+	_ = fs.WriteFile("/toolchain/bin/llvm-profdata", []byte("mock-profdata"), 0755)
+	_ = fs.WriteFile("/toolchain/bin/llvm-cov", []byte("mock-cov"), 0755)
 
 	// Create runtime_deps file
 	depsContent := "tint_wgsl_fuzzer\nlib/libswiftshader.so\nlibvulkan.so.1\nsrc/some_other_dep.dat\nlvp_icd.json\n"
@@ -527,10 +483,14 @@ func TestPrepareBinariesNoRuntimeDeps(t *testing.T) {
 	_ = fs.MkdirAll("/build", 0755)
 	_ = fs.WriteFile("/build/tint_wgsl_fuzzer", []byte("fuzzer-binary"), 0755)
 
+	// Keep the native compiler and source root in the CMake cache.
+	require.NoError(t, fs.WriteFile("/build/CMakeCache.txt", []byte(
+		"CMAKE_HOME_DIRECTORY:INTERNAL=/source\nCMAKE_CXX_COMPILER:FILEPATH=/toolchain/bin/clang++\n"), 0644))
+
 	// Create mock LLVM tools
-	_ = fs.MkdirAll("third_party/llvm-build/Release+Asserts/bin", 0755)
-	_ = fs.WriteFile("third_party/llvm-build/Release+Asserts/bin/llvm-profdata", []byte("mock-profdata"), 0755)
-	_ = fs.WriteFile("third_party/llvm-build/Release+Asserts/bin/llvm-cov", []byte("mock-cov"), 0755)
+	_ = fs.MkdirAll("/toolchain/bin", 0755)
+	_ = fs.WriteFile("/toolchain/bin/llvm-profdata", []byte("mock-profdata"), 0755)
+	_ = fs.WriteFile("/toolchain/bin/llvm-cov", []byte("mock-cov"), 0755)
 
 	ew := execwrapper.NewTestExecWrapperForSuccess([]byte("main\n"), nil)
 

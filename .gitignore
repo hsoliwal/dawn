@@ -1,6 +1,6 @@
 *.pyc
 
-# Directories added by gclient sync and the GN build
+# Dependency checkouts and local build/cache outputs
 /.cipd
 /.gclient
 /.gclient_entries
@@ -153,7 +153,6 @@ $RECYCLE.BIN/
 
 ### Intellij ###
 .idea
-
 
 # Misc inherited from Tint
 /test.wgsl

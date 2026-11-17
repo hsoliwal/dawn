@@ -28,14 +28,18 @@
 # Don't build testing in third_party dependencies
 set(BUILD_TESTING OFF)
 
-# fetch_dawn_dependencies.py is an alternative to using depot_tools
-# It is particularly interesting when building dawn as a subdirectory in
-# a parent project that does not want to use depot_tools.
+# Fetch only the native dependencies selected by fetch_dawn_dependencies.py.
 if (DAWN_FETCH_DEPENDENCIES)
     message(STATUS "Running fetch_dawn_dependencies:")
     set(_fetch_dependency_args --directory "${PROJECT_SOURCE_DIR}")
     if (DAWN_USE_AGILITY_SDK)
         list(APPEND _fetch_dependency_args --fetch-agility-sdk)
+    endif()
+    if (DAWN_ENABLE_SWIFTSHADER)
+        list(APPEND _fetch_dependency_args --fetch-swiftshader)
+    endif()
+    if (TINT_BUILD_MESA)
+        list(APPEND _fetch_dependency_args --fetch-mesa)
     endif()
     execute_process(
         COMMAND
@@ -93,28 +97,6 @@ if ((DAWN_BUILD_TESTS OR TINT_BUILD_TESTS) AND NOT TARGET gmock)
     set(gtest_force_shared_crt ON CACHE BOOL "Controls whether a shared run-time library should be used even when Google Test is built as static library" FORCE)
     add_subdirectory(${DAWN_GOOGLETEST_DIR} "${CMAKE_CURRENT_BINARY_DIR}/googletest" EXCLUDE_FROM_ALL)
 
-    # The CMake target GTest::gmock_main always sets -fexceptions, which is
-    # incompatible with WASM JSPI (though works with Asyncify). The only way to
-    # avoid this is to define our own custom CMake rule for it.
-    # (This is based on GMock's internal `gmock_main_no_exception` target.)
-    add_library(gmock_main_wasmsafe
-        "${gtest_SOURCE_DIR}/src/gtest-all.cc"
-        "${gmock_SOURCE_DIR}/src/gmock-all.cc"
-        "${gmock_SOURCE_DIR}/src/gmock_main.cc"
-    )
-    target_compile_options(gmock_main_wasmsafe
-        PUBLIC
-            "-fno-exceptions"
-            "-fno-rtti"
-    )
-    target_include_directories(gmock_main_wasmsafe SYSTEM
-        PRIVATE
-            "${gtest_SOURCE_DIR}"
-            "${gmock_SOURCE_DIR}"
-        PUBLIC
-            "${gtest_SOURCE_DIR}/include"
-            "${gmock_SOURCE_DIR}/include"
-    )
 endif()
 # Force ENABLE_RTTI in spirv-tools and glslang.
 set(ENABLE_RTTI ${DAWN_ENABLE_RTTI} CACHE BOOL "" FORCE)

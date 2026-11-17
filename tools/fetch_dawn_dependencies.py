@@ -27,9 +27,10 @@
 """
 Helper script to download Dawn's source dependencies for a CMake build.
 
-The version of every dependency is the commit pinned by its git submodule entry (the gitlink in this checkout)
-and its URL comes from .gitmodules, so no other dependency manifest is needed. The optional D3D12 Agility SDK is
-a binary package; its version is pinned below.
+Each source dependency is pinned by its git submodule entry (the gitlink in this
+checkout), and its URL comes from .gitmodules. Optional binary packages for the
+D3D12 Agility SDK and Mesa are pinned below. No dependency manifest is executed,
+and transitive submodules are not fetched.
 
 This helps embedders, for example through CMake, get all the sources with
 a single add_subdirectory call (or FetchContent) instead of more complex setups.
@@ -97,6 +98,14 @@ parser.add_argument('--fetch-agility-sdk',
                     action='store_true',
                     default=False,
                     help="Fetch the pinned D3D12 Agility SDK package.")
+parser.add_argument('--fetch-swiftshader',
+                    action='store_true',
+                    default=False,
+                    help="Fetch the native SwiftShader software GPU driver.")
+parser.add_argument('--fetch-mesa',
+                    action='store_true',
+                    default=False,
+                    help="Fetch Mesa and its pinned LLVM/Zstd fuzzing dependencies.")
 
 parser.add_argument('--list',
                     action='store_true',
@@ -131,11 +140,24 @@ AGILITY_SDK_PATH = 'third_party/agility-sdk/src'
 AGILITY_SDK_PACKAGE = 'chromium/third_party/agility-sdk'
 AGILITY_SDK_VERSION = 'version:2@1.722.0-preview'
 
+# Mesa's Linux build uses these native binary packages rather than submodules.
+MESA_PACKAGES = [
+    ('third_party/llvm-dev', 'infra/3pp/tools/llvm-dev/linux-amd64',
+     'version:3@22.1.0'),
+    ('third_party/zstd', 'infra/3pp/static_libs/libzstd/linux-amd64',
+     'Lf-seQJdussz81cZXnez5xIxEdkejDRxKumQpHbHMOUC'),
+]
+
 
 def main(args):
     root_dir = Path(args.directory).resolve()
     urls = submodule_urls(args, root_dir)
-    for submodule in REQUIRED_SUBMODULES:
+    required_submodules = list(REQUIRED_SUBMODULES)
+    if args.fetch_swiftshader:
+        required_submodules.append('third_party/swiftshader')
+    if args.fetch_mesa:
+        required_submodules.append('third_party/mesa/src')
+    for submodule in required_submodules:
         if submodule not in urls:
             sys.exit(f"{submodule} has no entry in {root_dir / '.gitmodules'}")
         commit = pinned_commit(args, root_dir, submodule)
@@ -143,8 +165,16 @@ def main(args):
             print(f"{submodule}\t{urls[submodule]}\t{commit}")
         else:
             fetch_git_dependency(args, urls[submodule], commit, root_dir / submodule)
-    if args.fetch_agility_sdk and not args.list:
-        fetch_package(AGILITY_SDK_PACKAGE, AGILITY_SDK_VERSION, root_dir / AGILITY_SDK_PATH)
+    packages = []
+    if args.fetch_agility_sdk:
+        packages.append((AGILITY_SDK_PATH, AGILITY_SDK_PACKAGE, AGILITY_SDK_VERSION))
+    if args.fetch_mesa:
+        packages.extend(MESA_PACKAGES)
+    for path, package, version in packages:
+        if args.list:
+            print(f"{path}\t{package}\t{version}")
+        else:
+            fetch_package(package, version, root_dir / path)
 
 
 def submodule_urls(args, root_dir):
@@ -170,48 +200,43 @@ def pinned_commit(args, root_dir, submodule):
 
 
 def fetch_git_dependency(args, git_url, git_tag, submodule_path):
-    # Run git from within the submodule's path (don't use for clone)
-    git = lambda *x: subprocess.run([args.git, '-C', submodule_path, *x],
-                                    capture_output=True)
+
+    # .git may be a directory (standalone clone) or a file (git submodule).
+    # Every mutating Git command must succeed before CMake can build this pin.
+    def git(*arguments, check=True):
+        return subprocess.run([args.git, '-C', submodule_path, *arguments],
+                              capture_output=True, check=check)
 
     log(f"Fetching dependency '{submodule_path}'")
     if (submodule_path / ".git").exists():
-        # The module was already cloned, but we may need to update it
-        proc = git('rev-parse', 'HEAD')
-        need_update = proc.stdout.decode().strip() != git_tag
-
-        if need_update:
-            proc = git('cat-file', '-t', git_tag)
-            git_tag_exists = proc.returncode == 0
-
-            if not git_tag_exists:
-                log(f"Updating '{submodule_path}' from '{git_url}'")
-                if args.shallow:
-                    git('fetch', git_url, git_tag, '--depth', '1')
-                else:
-                    git('fetch', git_url)
-
-            log(f"Checking out tag '{git_tag}'")
-            git('checkout', git_tag)
+        # A previous interrupted shallow fetch can leave an initialized checkout
+        # without HEAD. Treat that as an incomplete fetch and retry the pin.
+        head = git('rev-parse', '--verify', 'HEAD', check=False)
+        if head.returncode == 0 and head.stdout.decode().strip() == git_tag:
+            return
+        if git('cat-file', '-e', git_tag + '^{commit}', check=False).returncode:
+            log(f"Updating '{submodule_path}' from '{git_url}'")
+            fetch_arguments = ['fetch', git_url, git_tag]
+            if args.shallow:
+                fetch_arguments.extend(['--depth', '1'])
+            git(*fetch_arguments)
     else:
-        submodule_path.mkdir(parents=True, exist_ok=True)
         if args.shallow:
-            log(f"Shallow cloning '{git_url}' at '{git_tag}' into '{submodule_path}'"
-                )
+            log(f"Shallow cloning '{git_url}' at '{git_tag}' into '{submodule_path}'")
+            submodule_path.mkdir(parents=True, exist_ok=True)
             shallow_clone(git, git_url, git_tag)
         else:
             log(f"Cloning '{git_url}' into '{submodule_path}'")
-            subprocess.run([
-                args.git,
-                'clone',
-                '--recurse-submodules',
-                git_url,
-                submodule_path,
-            ],
-                           capture_output=True)
+            subprocess.run([args.git, 'clone', git_url, submodule_path],
+                           capture_output=True, check=True)
 
-        log(f"Checking out tag '{git_tag}'")
-        git('checkout', git_tag)
+    log(f"Checking out tag '{git_tag}'")
+    git('checkout', '--detach', git_tag)
+    current = git('rev-parse', 'HEAD').stdout.decode().strip()
+    expected = git('rev-parse', git_tag + '^{commit}').stdout.decode().strip()
+    if current != expected:
+        raise RuntimeError(f"Dependency '{submodule_path}' did not reach pinned commit {git_tag}")
+
 
 
 def fetch_package(name, version, package_path):

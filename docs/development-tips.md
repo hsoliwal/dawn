@@ -30,14 +30,12 @@ up the development/iteration process, compared with recompiling the project.
   - If you have just one build directory, you can alternatively pass this as
     a clangd argument: `--compile-commands-dir=out/Debug`
     - In VSCode: `clangd.arguments`
-  - For Chromium builds, take a look at
-    [`chrome-remote-index`](https://github.com/clangd/chrome-remote-index/blob/main/docs/index.md).
 
 
 Other documentation that may be useful:
 
 - [Clangd docs on how to integrate clangd in various editors](https://clangd.llvm.org/installation.html#editor-plugins)
-- [Chromium docs on using clangd](https://chromium.googlesource.com/chromium/src/+/main/docs/clangd.md)
+- [Clangd compilation database documentation](https://clangd.llvm.org/installation.html#project-setup)
 
 ### `.clangd`
 

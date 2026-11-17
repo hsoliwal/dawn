@@ -167,44 +167,48 @@ type ExperimentTask struct {
 
 // FuzzerConfig contains the details of how a fuzzer should be built/run by the experimental framework
 type FuzzerConfig struct {
-	mode            FuzzMode
-	additionGnFlags map[string]string
+	mode                 FuzzMode
+	cmakeTarget          string
+	additionalCMakeFlags map[string]string
 }
 
 var (
-	baseRequiredGnFlags = map[string]string{
-		"use_libfuzzer":          "true",
-		"tint_build_wgsl_reader": "true",
-		"use_clang_coverage":     "true",
-		"optimize_for_fuzzing":   "false",
+	baseRequiredCMakeFlags = map[string]string{
+		"TINT_BUILD_FUZZERS":     "ON",
+		"TINT_BUILD_WGSL_READER": "ON",
+		"DAWN_EMIT_COVERAGE":     "ON",
 	}
 
 	fuzzerConfigs = map[string]FuzzerConfig{
 		"tint_wgsl_fuzzer": {
-			mode:            FuzzModeWgsl,
-			additionGnFlags: map[string]string{},
+			cmakeTarget:          "tint_cmd_fuzz_wgsl_fuzz_cmd_sanitize_fuzzer",
+			mode:                 FuzzModeWgsl,
+			additionalCMakeFlags: map[string]string{},
 		},
 		"tint_ir_fuzzer": {
-			mode: FuzzModeIr,
-			additionGnFlags: map[string]string{
-				"tint_build_ir_binary": "true",
-				"tint_has_protobuf":    "true",
+			cmakeTarget: "tint_cmd_fuzz_ir_fuzz_cmd_sanitize_fuzzer",
+			mode:        FuzzModeIr,
+			additionalCMakeFlags: map[string]string{
+				"TINT_BUILD_IR_BINARY": "ON",
+				"DAWN_BUILD_PROTOBUF":  "ON",
 			},
 		},
 		"tint_wgsl_mesa_fuzzer": {
-			mode: FuzzModeWgsl,
-			additionGnFlags: map[string]string{
-				"tint_build_mesa":                  "true",
-				"tint_build_fuzzer_vulkan_support": "true",
+			cmakeTarget: "tint_cmd_fuzz_wgsl_mesa_fuzz_cmd_sanitize_fuzzer",
+			mode:        FuzzModeWgsl,
+			additionalCMakeFlags: map[string]string{
+				"TINT_BUILD_MESA":                  "ON",
+				"TINT_BUILD_FUZZER_VULKAN_SUPPORT": "ON",
 			},
 		},
 		"tint_ir_mesa_fuzzer": {
-			mode: FuzzModeIr,
-			additionGnFlags: map[string]string{
-				"tint_build_ir_binary":             "true",
-				"tint_has_protobuf":                "true",
-				"tint_build_mesa":                  "true",
-				"tint_build_fuzzer_vulkan_support": "true",
+			cmakeTarget: "tint_cmd_fuzz_ir_mesa_fuzz_cmd_sanitize_fuzzer",
+			mode:        FuzzModeIr,
+			additionalCMakeFlags: map[string]string{
+				"TINT_BUILD_IR_BINARY":             "ON",
+				"DAWN_BUILD_PROTOBUF":              "ON",
+				"TINT_BUILD_MESA":                  "ON",
+				"TINT_BUILD_FUZZER_VULKAN_SUPPORT": "ON",
 			},
 		},
 	}
@@ -385,7 +389,7 @@ func buildExperimentBinariesIfNeeded(t *taskConfig, settings ExperimentSettings)
 		return binDir, nil
 	}
 
-	hasSanitizers, err := checkGnArgs(t, missingBinaries)
+	hasSanitizers, err := checkCMakeArgs(t, missingBinaries)
 	if err != nil {
 		return "", err
 	}
@@ -420,7 +424,7 @@ func buildExperimentBinariesIfNeeded(t *taskConfig, settings ExperimentSettings)
 	}
 
 	fmt.Println("It looks like we are running a new experiment and need to build the fuzzers.")
-	fmt.Println("Building will checkout commit ", settings.Hash, " and update the submodules.")
+	fmt.Println("Building will checkout commit ", settings.Hash, " and synchronize native CMake dependencies.")
 	confirm, err := promptConfirm("Do you want to proceed with the build?")
 	if err != nil {
 		return "", fmt.Errorf("failed to read build confirmation: %w", err)
@@ -608,32 +612,6 @@ func runPendingExperimentTasks(t *taskConfig, pendingTasks []ExperimentTask, set
 	return nil
 }
 
-// GnValue holds the string value of a GN argument.
-type GnValue struct {
-	Value string `json:"value"`
-}
-
-// GnArg represents a single GN argument as returned by 'gn args --json'.
-type GnArg struct {
-	Name    string   `json:"name"`
-	Current *GnValue `json:"current,omitempty"`
-	Default *GnValue `json:"default,omitempty"`
-}
-
-// GetValue returns the effective value of a GN argument, stripping quotes.
-func (g *GnArg) GetValue() string {
-	val := ""
-	if g.Current != nil {
-		val = g.Current.Value
-	} else if g.Default != nil {
-		val = g.Default.Value
-	}
-	if strings.HasPrefix(val, "\"") && strings.HasSuffix(val, "\"") {
-		val = strings.Trim(val, "\"")
-	}
-	return val
-}
-
 // promptConfirm displays a yes/no prompt to the user.
 func promptConfirm(msg string) (bool, error) {
 	fmt.Printf("%s [y/N]: ", msg)
@@ -646,47 +624,69 @@ func promptConfirm(msg string) (bool, error) {
 	return text == "y" || text == "yes", nil
 }
 
-// checkGnArgs verifies that the build directory has the required GN flags set for the fuzzers being tested.
-// It also checks and returns true if any standard compiler sanitizers are enabled.
-func checkGnArgs(t *taskConfig, fuzzers []string) (bool, error) {
-	out, err := t.runCmd("gn", "args", t.build, "--list", "--json")
+// cmakeEnabled accepts the standard true spellings used by CMake BOOL cache entries.
+func cmakeEnabled(value string) bool {
+	switch strings.ToUpper(value) {
+	case "ON", "YES", "TRUE", "Y", "1":
+		return true
+	default:
+		number, err := strconv.ParseFloat(value, 64)
+		return err == nil && !math.IsNaN(number) && !math.IsInf(number, 0) && number != 0
+	}
+}
+
+// checkCMakeArgs verifies the native configuration needed by the requested fuzzers.
+// It also reports whether standard compiler sanitizers are enabled.
+func checkCMakeArgs(t *taskConfig, fuzzers []string) (bool, error) {
+	flagValues, err := t.readCMakeCache()
 	if err != nil {
-		return false, fmt.Errorf("failed to query GN arguments for build directory '%s': %w", t.build, err)
+		return false, err
+	}
+	if flagValues["CMAKE_CONFIGURATION_TYPES"] != "" {
+		return false, fmt.Errorf("native fuzzing requires a single-configuration CMake build; configure with Ninja or Unix Makefiles")
+	}
+	if cmakeEnabled(flagValues["BUILD_SHARED_LIBS"]) {
+		return false, fmt.Errorf("saved fuzz experiments require BUILD_SHARED_LIBS=OFF; configure a static native build so copied binaries do not depend on the original build's library paths")
 	}
 
-	var args []GnArg
-	if err := json.Unmarshal(out, &args); err != nil {
-		return false, fmt.Errorf("failed to parse GN arguments JSON: %w", err)
-	}
-
-	flagValues := make(map[string]string)
-	for _, arg := range args {
-		flagValues[arg.Name] = arg.GetValue()
-	}
-
-	requiredFlags := maps.Clone(baseRequiredGnFlags)
+	requiredFlags := maps.Clone(baseRequiredCMakeFlags)
 	for _, fuzzer := range fuzzers {
-		cfg, _ := fuzzerConfigs[fuzzer]
-		maps.Copy(requiredFlags, cfg.additionGnFlags)
+		cfg, ok := fuzzerConfigs[fuzzer]
+		if !ok {
+			return false, fmt.Errorf("unknown fuzzer: %s", fuzzer)
+		}
+		maps.Copy(requiredFlags, cfg.additionalCMakeFlags)
 	}
 
 	var incorrect []string
-	for flag, req := range requiredFlags {
-		val := flagValues[flag]
-		if val != req {
-			incorrect = append(incorrect, fmt.Sprintf("%s (expected: %s, actual: %s)", flag, req, val))
+	for flag := range requiredFlags {
+		if !cmakeEnabled(flagValues[flag]) {
+			incorrect = append(incorrect, fmt.Sprintf("%s (expected: ON, actual: %s)", flag, flagValues[flag]))
 		}
 	}
-
 	if len(incorrect) > 0 {
-		return false, fmt.Errorf("the build directory '%s' has incorrect/missing GN configuration flags:\n  - %s\nPlease update your GN args and re-run", t.build, strings.Join(incorrect, "\n  - "))
+		slices.Sort(incorrect)
+		return false, fmt.Errorf("the build directory '%s' has incorrect/missing CMake configuration flags:\n  - %s\nPlease update the native CMake configuration and re-run", t.build, strings.Join(incorrect, "\n  - "))
 	}
 
-	hasSanitizers := flagValues["is_asan"] == "true" ||
-		flagValues["is_ubsan"] == "true" ||
-		flagValues["is_tsan"] == "true" ||
-		flagValues["is_msan"] == "true"
-
+	hasSanitizers := cmakeEnabled(flagValues["DAWN_ENABLE_ASAN"]) ||
+		cmakeEnabled(flagValues["DAWN_ENABLE_UBSAN"]) ||
+		cmakeEnabled(flagValues["DAWN_ENABLE_TSAN"]) ||
+		cmakeEnabled(flagValues["DAWN_ENABLE_MSAN"])
+	for _, language := range []string{"C", "CXX"} {
+		flag := "CMAKE_" + language + "_FLAGS"
+		flags := flagValues[flag] + " " + flagValues[flag+"_"+strings.ToUpper(flagValues["CMAKE_BUILD_TYPE"])]
+		for _, argument := range strings.Fields(flags) {
+			if sanitizers, ok := strings.CutPrefix(argument, "-fsanitize="); ok {
+				for _, sanitizer := range strings.Split(sanitizers, ",") {
+					switch sanitizer {
+					case "address", "undefined", "thread", "memory":
+						hasSanitizers = true
+					}
+				}
+			}
+		}
+	}
 	return hasSanitizers, nil
 }
 
@@ -717,23 +717,48 @@ func prepareBinaries(t *taskConfig, settings *ExperimentSettings, binDir string,
 		})
 }
 
-// copyLlvmTools copies the LLVM coverage tools to the bin directory.
+// copyLlvmTools copies coverage tools from the configured native compiler's
+// directory. LLVM_BIN_DIR supports installations that package these separately.
 func copyLlvmTools(t *taskConfig, binDir string) error {
-	llvmBinDir := filepath.Join(fileutils.DawnRoot(t.osWrapper), "third_party", "llvm-build", "Release+Asserts", "bin")
+	llvmBinDir := t.osWrapper.Getenv("LLVM_BIN_DIR")
+	if llvmBinDir == "" {
+		cache, err := t.readCMakeCache()
+		if err != nil {
+			return err
+		}
+		compiler := cache["CMAKE_CXX_COMPILER"]
+		if compiler == "" {
+			return fmt.Errorf("CMAKE_CXX_COMPILER is missing; set LLVM_BIN_DIR to the matching LLVM coverage tools")
+		}
+		llvmBinDir = filepath.Dir(compiler)
+	}
 	tools := []string{"llvm-profdata", "llvm-cov"}
 	for _, tool := range tools {
 		toolExe := tool + fileutils.ExeExt
 		srcPath := filepath.Join(llvmBinDir, toolExe)
 		dstPath := filepath.Join(binDir, toolExe)
 		if err := fileutils.CopyFile(dstPath, srcPath, t.osWrapper); err != nil {
-			return fmt.Errorf("failed to copy %s to bin folder: %w", tool, err)
+			return fmt.Errorf("failed to copy %s from %s to bin folder (set LLVM_BIN_DIR if needed): %w", tool, llvmBinDir, err)
 		}
 	}
 	return nil
 }
 
-// copyFuzzerAndDependencies makes a copy of a fuzzer binary and its runtime dependencies in the target bin folder. The runtime dependencies come from the GN output file <fuzzer>.runtime_deps, but only includes the dynamic libraries listed there and none of the harness/framework files.
+// copyFuzzerAndDependencies copies the binary and native runtime libraries.
+// An explicit <fuzzer>.runtime_deps manifest is accepted when provided; otherwise
+// shared libraries and ICD files are collected from the native CMake build tree.
 func copyFuzzerAndDependencies(t *taskConfig, fuzzer string, binDir string) error {
+	buildRoot, err := filepath.Abs(t.build)
+	if err != nil {
+		return err
+	}
+	destination, err := filepath.Abs(binDir)
+	if err != nil {
+		return err
+	}
+	if destination == buildRoot {
+		return fmt.Errorf("experiment binaries must be copied to a directory separate from the native build")
+	}
 	srcPath := filepath.Join(t.build, fuzzer+fileutils.ExeExt)
 	dstPath := filepath.Join(binDir, fuzzer+fileutils.ExeExt)
 	if err := fileutils.CopyFile(dstPath, srcPath, t.osWrapper); err != nil {
@@ -741,64 +766,99 @@ func copyFuzzerAndDependencies(t *taskConfig, fuzzer string, binDir string) erro
 	}
 
 	runtimeDepsPath := filepath.Join(t.build, fuzzer+".runtime_deps")
+	var depsBytes []byte
 	if fileutils.IsFile(runtimeDepsPath, t.osWrapper) {
-		depsBytes, err := t.osWrapper.ReadFile(runtimeDepsPath)
+		var err error
+		depsBytes, err = t.osWrapper.ReadFile(runtimeDepsPath)
 		if err != nil {
 			return fmt.Errorf("failed to read runtime deps for %s: %w", fuzzer, err)
 		}
-
-		depsStr := string(depsBytes)
-		for line := range strings.SplitSeq(depsStr, "\n") {
-			line = strings.TrimSpace(line)
-			if line == "" {
-				continue
-			}
-
-			// Skip copying the fuzzer binary itself, as it was copied above
-			if line == fuzzer || line == fuzzer+fileutils.ExeExt {
-				continue
-			}
-
-			// Only copy if it's a shared library or ICD configuration
-			if !shouldCopyRuntimeDep(line) {
-				continue
-			}
-
-			srcDep := filepath.Join(t.build, line)
-			dstDep := filepath.Join(binDir, line)
-
-			// Ensure parent directory exists
-			if err := t.osWrapper.MkdirAll(filepath.Dir(dstDep), 0755); err != nil {
-				return fmt.Errorf("failed to create directory for runtime dependency %s: %w", line, err)
-			}
-
-			info, err := t.osWrapper.Stat(srcDep)
+	} else {
+		var dependencies []string
+		err := t.osWrapper.Walk(t.build, func(path string, info os.FileInfo, err error) error {
 			if err != nil {
-				return fmt.Errorf("runtime dependency %s missing: %w", srcDep, err)
+				return err
+			}
+			if info.IsDir() {
+				absolute, err := filepath.Abs(path)
+				if err != nil {
+					return err
+				}
+				if absolute == destination {
+					return filepath.SkipDir
+				}
+				return nil
+			}
+			if !shouldCopyRuntimeDep(path) {
+				return nil
+			}
+			if filepath.Ext(path) == ".json" && !strings.Contains(filepath.Base(path), "icd") {
+				return nil
+			}
+			relative, err := filepath.Rel(t.build, path)
+			if err != nil {
+				return err
+			}
+			dependencies = append(dependencies, relative)
+			return nil
+		})
+		if err != nil {
+			return fmt.Errorf("failed to collect native runtime dependencies: %w", err)
+		}
+		slices.Sort(dependencies)
+		depsBytes = []byte(strings.Join(dependencies, "\n"))
+	}
+
+	for line := range strings.SplitSeq(string(depsBytes), "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+
+		// Skip copying the fuzzer binary itself, as it was copied above
+		if line == fuzzer || line == fuzzer+fileutils.ExeExt {
+			continue
+		}
+
+		// Only copy if it's a shared library or ICD configuration
+		if !shouldCopyRuntimeDep(line) {
+			continue
+		}
+
+		srcDep := filepath.Join(t.build, line)
+		dstDep := filepath.Join(binDir, line)
+
+		// Ensure parent directory exists
+		if err := t.osWrapper.MkdirAll(filepath.Dir(dstDep), 0755); err != nil {
+			return fmt.Errorf("failed to create directory for runtime dependency %s: %w", line, err)
+		}
+
+		info, err := t.osWrapper.Stat(srcDep)
+		if err != nil {
+			return fmt.Errorf("runtime dependency %s missing: %w", srcDep, err)
+		}
+
+		if !info.IsDir() {
+			// Note: Go resolves symlinks automatically in the os package, so using CopyFile leads to symlinks (e.g. libvulkan.so.1) in the destination folder being real files with the correct content.
+			if err := fileutils.CopyFile(dstDep, srcDep, t.osWrapper); err != nil {
+				return fmt.Errorf("failed to copy runtime dependency %s to bin folder: %w", line, err)
 			}
 
-			if !info.IsDir() {
-				// Note: Go resolves symlinks automatically in the os package, so using CopyFile leads to symlinks (e.g. libvulkan.so.1) in the destination folder being real files with the correct content.
-				if err := fileutils.CopyFile(dstDep, srcDep, t.osWrapper); err != nil {
-					return fmt.Errorf("failed to copy runtime dependency %s to bin folder: %w", line, err)
-				}
-
-				// Make sure relative library_path in ICD JSONs is absolute so Vulkan/Loader can load it from any working directory
-				if filepath.Ext(dstDep) == ".json" {
-					contentBytes, err := t.osWrapper.ReadFile(dstDep)
-					if err == nil {
-						re := regexp.MustCompile(`"library_path"\s*:\s*"(?:\./)?([^/"][^"]*)"`)
-						absBinDir, _ := filepath.Abs(filepath.Dir(dstDep))
-						newContent := re.ReplaceAllStringFunc(string(contentBytes), func(match string) string {
-							m := re.FindStringSubmatch(match)
-							if len(m) > 1 {
-								absLibPath := filepath.Join(absBinDir, m[1])
-								return fmt.Sprintf(`"library_path": "%s"`, absLibPath)
-							}
-							return match
-						})
-						_ = t.osWrapper.WriteFile(dstDep, []byte(newContent), 0644)
-					}
+			// Make sure relative library_path in ICD JSONs is absolute so Vulkan/Loader can load it from any working directory
+			if filepath.Ext(dstDep) == ".json" {
+				contentBytes, err := t.osWrapper.ReadFile(dstDep)
+				if err == nil {
+					re := regexp.MustCompile(`"library_path"\s*:\s*"(?:\./)?([^/"][^"]*)"`)
+					absBinDir, _ := filepath.Abs(filepath.Dir(dstDep))
+					newContent := re.ReplaceAllStringFunc(string(contentBytes), func(match string) string {
+						m := re.FindStringSubmatch(match)
+						if len(m) > 1 {
+							absLibPath := filepath.Join(absBinDir, m[1])
+							return fmt.Sprintf(`"library_path": %s`, strconv.Quote(absLibPath))
+						}
+						return match
+					})
+					_ = t.osWrapper.WriteFile(dstDep, []byte(newContent), 0644)
 				}
 			}
 		}
