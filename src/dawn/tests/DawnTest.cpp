@@ -78,7 +78,6 @@
 #include "src/dawn/utils/ComboRenderPipelineDescriptor.h"
 #include "src/dawn/utils/PlatformDebugLogger.h"
 #include "src/dawn/utils/SystemUtils.h"
-#include "src/dawn/utils/TerribleCommandBuffer.h"
 #include "src/dawn/utils/TestUtils.h"
 #include "src/dawn/utils/Timer.h"
 #include "src/dawn/utils/WGPUHelpers.h"
