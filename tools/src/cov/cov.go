@@ -29,6 +29,5 @@
 // information from multiple processes.
 //
 // Combined coverage data is compressed by Tree.Optimize() and is encoded to
-// JSON and zlib compressed with Tree.Encode(). This file can be viewed with
-// tools/src/cov/view-coverage.html.
+// JSON and zlib compressed with Tree.Encode() for native coverage tooling.
 package cov

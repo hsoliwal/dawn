@@ -13,7 +13,7 @@ If you are developing Dawn itself, see also
  * `CMake` 3.22 or later
  * Ninja 1.12 (or another build tool supported by CMake)
  * Python 3, for fetching dependencies
- * Go 1.23 or later: https://go.dev/
+ * Go 1.26 or later, as declared by `go.mod`: https://go.dev/
  * A C++20 compiler
     * Check the platform details below.
 
@@ -59,7 +59,8 @@ Use `tools/fetch_dawn_dependencies.py` to clone the dependencies' repositories:
 
 ```sh
 # Clone the repo as "dawn"
-git clone https://dawn.googlesource.com/dawn dawn && cd dawn
+git clone https://github.com/hsoliwal/dawn.git
+cd dawn
 
 # Fetch dependencies
 python tools/fetch_dawn_dependencies.py
@@ -68,9 +69,19 @@ python tools/fetch_dawn_dependencies.py
 Use `python tools/fetch_dawn_dependencies.py -h` to know more about the available options. The script
 does not figure out option-dependent requirements automatically.
 
+The checkout's gitlinks pin native source commits, and `.gitmodules` records
+their repository URLs. The CMake dependency fetcher uses an explicit native
+dependency list without a `DEPS` file, `gclient` configuration, or recursive
+submodule fetching. Source mirrors hosted on `chromium.googlesource.com` still
+provide some native dependencies; their host name does not introduce a browser
+runtime. Use `python tools/fetch_dawn_dependencies.py --list` to inspect the pins
+without downloading dependencies.
+
 On Windows, configuring CMake with both `DAWN_FETCH_DEPENDENCIES=ON` and
 `DAWN_USE_AGILITY_SDK=ON` downloads the Agility SDK version pinned in
-`tools/fetch_dawn_dependencies.py`.
+`tools/fetch_dawn_dependencies.py`. The same script holds the Linux LLVM/Zstd
+package pins needed by optional Mesa builds. CMake passes `--fetch-swiftshader`
+or `--fetch-mesa` when those native drivers are enabled.
 
 ### Linux dependencies
 
@@ -80,7 +91,7 @@ The following packages are needed to build Dawn. (Package names are the Ubuntu n
 * `libxrandr-dev`
 * `libxinerama-dev`
 * `libxcursor-dev`
-( `libxkbcommon-dev`
+* `libxkbcommon-dev`
 * `libxi-dev`
 * `mesa-common-dev`
 * `libx11-xcb-dev`
@@ -96,25 +107,41 @@ sudo apt-get install libfuse2 libxrandr-dev libxinerama-dev libxcursor-dev libxk
 ### Compiling using CMake + Ninja
 
 ```sh
-mkdir -p out/Debug
-cd out/Debug
-cmake -GNinja ../..
-ninja # or autoninja
+cmake -S . -B out/Debug -G Ninja -DCMAKE_BUILD_TYPE=Debug
+cmake --build out/Debug --parallel 2
 ```
 
 ### Compiling using CMake + make
 
 ```sh
-mkdir -p out/Debug
-cd out/Debug
-cmake ../..
-make # -j N for N-way parallel build
+cmake -S . -B out/Debug -G "Unix Makefiles" -DCMAKE_BUILD_TYPE=Debug
+cmake --build out/Debug --parallel 2
 ```
 
 For CMake builds, you can enable installation with the `DAWN_ENABLE_INSTALL` option
 and use `find_package(Dawn)` in your CMake project to discover Dawn and link with
 the `dawn::webgpu_dawn` target. Please see [Quickstart with CMake](./quickstart-cmake.md)
 for step-by-step instructions.
+
+Use a fresh build directory for a different generator or toolchain. Browser
+configurations (`EMSCRIPTEN`, `CMAKE_SYSTEM_NAME=Emscripten`, or
+`DAWN_BUILD_NODE_BINDINGS=ON`) are rejected before dependency fetching. Native
+Android builds still use the Android NDK toolchain and retain JNI bindings.
+
+For headless compute builds, disable the sample/window-system integration:
+
+```sh
+cmake -S . -B out/Compute -G Ninja \
+  -DCMAKE_BUILD_TYPE=Release -DDAWN_FETCH_DEPENDENCIES=ON \
+  -DDAWN_ENABLE_INSTALL=ON -DDAWN_BUILD_SAMPLES=OFF \
+  -DDAWN_USE_GLFW=OFF -DDAWN_USE_X11=OFF -DDAWN_USE_WAYLAND=OFF \
+  -DDAWN_BUILD_TESTS=OFF -DTINT_BUILD_TESTS=OFF
+cmake --build out/Compute --target webgpu_dawn --parallel 2
+cmake --install out/Compute --prefix install/Compute
+```
+
+GPU backends and their platform SDKs remain native build inputs. Disabling
+window-system integration does not remove Vulkan, Metal, or Direct3D compute.
 
 ### Cross-Compilation
 
@@ -127,13 +154,8 @@ configuration for arm64-v8a, armeabi-v7a and x86.
 There is a substantial number of source files that are needed to be
 built for Dawn and its dependencies (~thousands), which can lead to
 long compile times on resource bound machines (i.e. laptops),
-especially when performing clean builds. The general advice for this
-situation is use the gn build with a remote compile system like siso,
-if available.
-
-An alternative if remote compilation isn't available, or if using
-CMake is essential for your workflow, is to use
-[ccache](https://ccache.dev/) to avoid rebuilding targets. For full
+especially when performing clean builds. Use
+[ccache](https://ccache.dev/) with the native CMake build to avoid rebuilding targets. For full
 details on using ccache see the project's documentation, but below is
 an example of how to use it on a Debian based Linux dev env.
 
@@ -143,10 +165,9 @@ apt-get install ccache
 ccache -F 0 -M 0  # Sets the number of files and size of the cache to unlimited, the default is 5 GiB. Choose values that make sense for your situation.
 
 # Setup CMake + Ninja building using cccache
-mkdir -p out/cache
-cd out/cache
-cmake -GNinja -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache <Any other CMake flags> ../.
-ninja # or autoninja
+cmake -S . -B out/cache -G Ninja \
+  -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
+cmake --build out/cache --parallel 2
 
 # Optional: In another terminal, monitor the status of the cache. (Will have a lot of misses on the first run)
 watch ccache -s

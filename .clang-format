@@ -40,5 +40,3 @@ AccessModifierOffset: -2
 # from being reformatted. It sort of works though.
 WhitespaceSensitiveMacros:
     - "DAWN_MULTILINE"
-    # Note: if we run into issues with EM_ASM being autoformatted incorrectly, we should add it here.
-    # https://emscripten.org/docs/porting/connecting_cpp_and_javascript/Interacting-with-code.html#calling-javascript-from-c-c

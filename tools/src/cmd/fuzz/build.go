@@ -29,25 +29,83 @@ package main
 
 import (
 	"fmt"
+	"path/filepath"
+	"strings"
+
+	"dawn.googlesource.com/dawn/tools/src/fileutils"
 )
 
-// buildTargets builds a list of ninja targets. If targets is empty everything will be built.
+// readCMakeCache reads the configured build without invoking a browser toolchain.
+func (t *taskConfig) readCMakeCache() (map[string]string, error) {
+	path := filepath.Join(t.build, "CMakeCache.txt")
+	data, err := t.osWrapper.ReadFile(path)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read native CMake cache %s: %w", path, err)
+	}
+	values := make(map[string]string)
+	for _, line := range strings.Split(string(data), "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" || strings.HasPrefix(line, "#") || strings.HasPrefix(line, "//") {
+			continue
+		}
+		keyType, value, ok := strings.Cut(line, "=")
+		if !ok {
+			continue
+		}
+		key, _, ok := strings.Cut(keyType, ":")
+		if ok {
+			values[key] = value
+		}
+	}
+	return values, nil
+}
+
+// buildTargets builds CMake targets. If targets is empty everything will be built.
 func (t *taskConfig) buildTargets(targets []string) error {
 	fmt.Printf("Building %v...\n", targets)
-	args := []string{"-C", t.build}
-	args = append(args, targets...)
-	if _, err := t.runCmd("autoninja", args...); err != nil {
+	args := []string{"--build", t.build}
+	if len(targets) > 0 {
+		args = append(args, "--target")
+		for _, target := range targets {
+			// CMake's logical target differs from the output binary's name.
+			if config, ok := fuzzerConfigs[strings.TrimSuffix(target, fileutils.ExeExt)]; ok {
+				target = config.cmakeTarget
+			}
+			args = append(args, target)
+		}
+	}
+	if _, err := t.runCmd("cmake", args...); err != nil {
 		return fmt.Errorf("build failed for %v: %w", targets, err)
 	}
 
 	return nil
 }
 
-// syncAndBuildTargets updates the pinned submodules and then builds a list of ninja targets.
-func (t *taskConfig) syncAndBuildTargets(targets []string) error {
-	if _, err := t.runCmd("git", "submodule", "update", "--init"); err != nil {
-		return fmt.Errorf("git submodule update failed: %w", err)
+// syncDependencies preserves the build's CMake options and fetches native pins
+// for the checked-out revision before regenerating the build graph.
+func (t *taskConfig) syncDependencies() error {
+	cache, err := t.readCMakeCache()
+	if err != nil {
+		return err
 	}
+	if cache["CMAKE_CONFIGURATION_TYPES"] != "" {
+		return fmt.Errorf("native fuzzing requires a single-configuration CMake build; configure with Ninja or Unix Makefiles")
+	}
+	root := cache["CMAKE_HOME_DIRECTORY"]
+	if root == "" {
+		return fmt.Errorf("CMAKE_HOME_DIRECTORY is missing from %s/CMakeCache.txt", t.build)
+	}
+	if _, err := t.runCmd("cmake", "-S", root, "-B", t.build,
+		"-DDAWN_FETCH_DEPENDENCIES=ON"); err != nil {
+		return fmt.Errorf("native dependency synchronization failed: %w", err)
+	}
+	return nil
+}
 
+// syncAndBuildTargets synchronizes native dependencies and builds CMake targets.
+func (t *taskConfig) syncAndBuildTargets(targets []string) error {
+	if err := t.syncDependencies(); err != nil {
+		return err
+	}
 	return t.buildTargets(targets)
 }

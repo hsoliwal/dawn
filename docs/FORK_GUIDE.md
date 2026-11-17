@@ -33,9 +33,9 @@ Some headers and implementations are generated. If a header is missing from a so
 
 The checked-out [CMakeLists.txt](../CMakeLists.txt) requires **CMake 3.22 or later**. Prefer the build-system requirement if prose from another revision disagrees.
 
-The [build guide](building.md) also specifies Git, Python 3, Go 1.23+, a C++20 compiler, and Ninja 1.12 or an alternative CMake-supported build tool. This fork builds with CMake, not GN/depot_tools, and has no `dawn.node` target. Platform SDKs, compiler versions and Linux packages are detailed in the guide.
+The [build guide](building.md) also specifies Git, Python 3, Go 1.26+, a C++20 compiler, and Ninja 1.12 or an alternative CMake-supported build tool. This fork builds with CMake, not GN/depot_tools, and has no `dawn.node` target. Platform SDKs, compiler versions and Linux packages are detailed in the guide.
 
-Dependency fetching uses network access and can download substantial toolchains. Read the build guide's dependency license notice, including Direct3D WARP, before fetching. This guide does not accept those terms for you.
+Dependency fetching uses network access for native source commits pinned by the checkout's gitlinks, with URLs from `.gitmodules`. Optional binary package pins are in `tools/fetch_dawn_dependencies.py`. Review each dependency's license when distributing native outputs; optional SDK assets retain their own terms.
 
 ## CMake command cheat sheet
 
@@ -68,7 +68,7 @@ Do not mix generators or toolchain configurations in one output directory. The d
 | Internal logic or API validation? | Dawn unit/validation tests | Actual GPU execution |
 | Native execution? | Dawn end-to-end tests | All GPUs or operating systems |
 | Shader translation? | Tint unit and end-to-end tests | Whole-application correctness |
-| Speed? | [Performance tests](dawn/testing.md#dawn-perf-tests) | Comparable results without controlled settings |
+| Speed? | [Native benchmarks](dawn/testing.md#native-benchmarks) | Comparable results without controlled settings |
 
 Dawn's CMake test build is optional. For a dedicated single-config test tree, after the same prerequisites and dependency review:
 

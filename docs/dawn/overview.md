@@ -18,7 +18,7 @@ WebGPU API. It is used to generate the API headers, C++ wrapper, and more!
 - [`include`](../../include):
     - [`dawn`](../../include/dawn): public headers with subdirectories for each library. Note that
       some headers are auto-generated and not present directly in the directory.
-- [`scripts`](../../scripts): contains a grab-bag of files that are used for building Dawn, in
+- [`tools`](../../tools): contains utilities that are used for building Dawn, in
   testing, etc.
 - [`src`](../../src):
   - [`dawn`](../../src/dawn): root directory for Dawn code

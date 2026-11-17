@@ -40,7 +40,6 @@ BUILD_SYSTEM=""
 BUILD_TYPE=""
 BUILD_ARCH=""
 VERBOSE=""
-SISO="1"
 SHARED=""
 INSTALL=""
 UBSAN=""
@@ -67,8 +66,7 @@ function show_usage() {
   echo "  install       Install to out/install (cmake only)"
   echo "  native        Target the machine you're running on"
   echo "  x86           Target a 32-bit x86 (adds -m32 to compiler flags)"
-  echo "  local         Use local compilation instead of remote"
-  echo "  remoteexec    Use siso to improve compile time (the default)"
+  echo "  local         Use local compilation (the default)"
   echo "  shared        Build shared libs (cmake only)"
   echo "  ubsan         Enable undefined behaviour sanitizer"
   echo "  ndk=\$NDK_DIR The Android NDK root directory."
@@ -137,10 +135,10 @@ for arg in "$@"; do
       VERBOSE=1
     ;;
     "remoteexec")
-      SISO=1
+      show_usage "remoteexec requires the removed Chromium build tooling; use local CMake compilation"
     ;;
     "local")
-      SISO=
+      # Kept as a no-op for existing native build commands.
     ;;
     "shared")
       SHARED=1
@@ -218,7 +216,6 @@ case $BUILD_SYSTEM in
     CMAKE_FLAGS+=("-DTINT_BUILD_SPV_WRITER=1")
     CMAKE_FLAGS+=("-DTINT_BUILD_WGSL_WRITER=1")
     CMAKE_FLAGS+=("-DTINT_BUILD_SPV_READER=1")
-    CMAKE_FLAGS+=("-DDAWN_BUILD_NODE_BINDINGS=1")
     CMAKE_FLAGS+=("-DCMAKE_CXX_COMPILER=clang++")
     CMAKE_FLAGS+=("-DCMAKE_C_COMPILER=clang")
     if [[ $USE_GCC_RUNTIME == 1 ]]; then

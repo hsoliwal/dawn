@@ -1,8 +1,7 @@
 # Follow .clang-format for formatting
 FormatStyle: file
-# GN doesn't support -isystem so Clang-Tidy doesn't know which headers belong
-# to us when applying checks/fixes. Set that here.
-HeaderFilterRegex: '^(src|include|third_party/emdawnwebgpu)/.*)'
+# Apply checks and fixes to Dawn's native source and public headers.
+HeaderFilterRegex: '^(src|include)/.*'
 
 Checks:
   # List of checks: https://clang.llvm.org/extra/clang-tidy/checks/list.html
@@ -175,7 +174,6 @@ Checks:
 
   # P∞. Checks we're not really interested in re-enabling.
   - -bugprone-throwing-static-initialization  # We don't have exceptions, so nothing throws
-  # -ftrivial-auto-var-init = pattern (debug) or zero (release) is enabled across chrome build, which addresses uninitialized issues of POD variables.
   - -cppcoreguidelines-init-variables
   # - Appears unnecessary since we use hardened libc++.
   - -cppcoreguidelines-pro-bounds-avoid-unchecked-container-access
