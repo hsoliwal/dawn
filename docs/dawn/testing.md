@@ -8,14 +8,54 @@ the removed `dawn_wire` tests are not available.
 With the platform toolchain and dependencies installed, configure a dedicated CMake build:
 
 ```sh
-cmake -S . -B out/Tests -G Ninja -DDAWN_FETCH_DEPENDENCIES=ON -DDAWN_BUILD_TESTS=ON -DCMAKE_BUILD_TYPE=Debug
-cmake --build out/Tests --target dawn_unittests dawn_end2end_tests
+cmake -S . -B out/Tests -G Ninja -DDAWN_FETCH_DEPENDENCIES=ON -DDAWN_BUILD_TESTS=ON -DTINT_BUILD_TESTS=ON -DCMAKE_BUILD_TYPE=Debug
+cmake --build out/Tests --target dawn_unittests dawn_end2end_tests tint_cmd_test_test_cmd --parallel 2
 ./out/Tests/dawn_unittests
+./out/Tests/tint_unittests
 ```
 
 `dawn_unittests` includes native validation tests; `dawn_end2end_tests` requires an
 appropriate GPU/backend/driver environment. These commands are examples, not executed
 verification results.
+
+The Tint target `tint_cmd_test_test_cmd` produces `tint_unittests`. For a
+multi-configuration generator, pass `--config Debug` and use its configuration
+output directory. Windows executables have the `.exe` suffix. Discover native
+GPU cases with `dawn_end2end_tests --gtest_list_tests`, then execute a selected
+case with `--gtest_filter`; listing tests is not execution.
+
+## Native build regression checks
+
+Check native dependency selection, dependency-fetch failures, build-helper
+arguments, and rejected browser configurations without downloading dependencies
+or accessing a GPU:
+
+```sh
+python3 tools/native_build_test.py
+cd tools/src
+go test ./cmd/fuzz
+```
+
+The `chromium_test_compat` helper translates existing native test flags to
+GTest output options. It does not require a Chromium checkout or browser.
+
+## Native benchmarks
+
+The CMake target `dawn_benchmarks` measures native object creation and related
+host work using the null backend:
+
+```sh
+cmake -S . -B out/Benchmarks -G Ninja \
+  -DCMAKE_BUILD_TYPE=Release -DDAWN_FETCH_DEPENDENCIES=ON \
+  -DDAWN_BUILD_BENCHMARKS=ON -DDAWN_BUILD_TESTS=OFF \
+  -DTINT_BUILD_TESTS=OFF -DDAWN_BUILD_SAMPLES=OFF
+cmake --build out/Benchmarks --target dawn_benchmarks --parallel 2
+./out/Benchmarks/dawn_benchmarks
+```
+
+Null-backend timings do not measure GPU throughput. Compare results with the
+same compiler, dependency revisions, configuration, machine, and benchmark
+selection.
 
 ## Performance-test sources (not a current CMake target)
 

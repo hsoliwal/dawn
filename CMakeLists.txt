@@ -63,11 +63,7 @@ set(DAWN_SRC_DIR "${Dawn_SOURCE_DIR}/src" CACHE PATH "Directory that contains so
 set(DAWN_INCLUDE_DIR "${Dawn_SOURCE_DIR}/include" CACHE PATH "Directory that contains public headers for dawn")
 set(DAWN_TEMPLATE_DIR "${DAWN_GENERATOR_DIR}/templates" CACHE PATH "Directory that contains templates for generators")
 
-# Emscripten.cmake toolchain sets this variable to `0`; otherwise, it's undefined, so set it to 1.
-set_if_not_defined(EMSCRIPTEN 0 "1 if building with Emscripten")
-if (EMSCRIPTEN)
-  message(FATAL_ERROR "Browser builds (Emscripten, emdawnwebgpu) were removed from this fork; build Dawn natively.")
-endif()
+include(DawnNativeOnly)
 
 ################################################################################
 # Configuration options
@@ -217,7 +213,7 @@ endif()
 if (DAWN_BUILD_MONOLITHIC_LIBRARY AND BUILD_SHARED_LIBS)
     message(FATAL_ERROR "DAWN_BUILD_MONOLITHIC_LIBRARY SHARED/STATIC requires BUILD_SHARED_LIBS=OFF. Otherwise the bundled library will depend on other shared libraries which defeats the purpose.")
 endif()
-option(DAWN_FETCH_DEPENDENCIES "Use fetch_dawn_dependencies.py as an alternative to using depot_tools" OFF)
+option(DAWN_FETCH_DEPENDENCIES "Fetch the pinned native dependencies with fetch_dawn_dependencies.py" OFF)
 
 if (DAWN_ENABLE_OPENGLES OR DAWN_ENABLE_DESKTOP_GL)
   set(TINT_DEFAULT_GLSL ON)

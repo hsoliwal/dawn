@@ -176,10 +176,10 @@ func runBisect(t *taskConfig) error {
 
 	bc.fuzzerName = filepath.Base(t.fuzzer)
 
-	// Verify build directory exists and is a GN build (contains args.gn)
-	argsGnPath := filepath.Join(t.build, "args.gn")
-	if !fileutils.IsFile(argsGnPath, t.osWrapper) {
-		return fmt.Errorf("build directory '%v' does not appear to be a GN build directory (missing args.gn), which is required for bisecting", t.build)
+	// A configured native build is required to preserve compiler/backend options.
+	cachePath := filepath.Join(t.build, "CMakeCache.txt")
+	if !fileutils.IsFile(cachePath, t.osWrapper) {
+		return fmt.Errorf("build directory '%v' is missing CMakeCache.txt; configure a native CMake build before bisecting", t.build)
 	}
 
 	var err error
@@ -257,7 +257,7 @@ func runBisect(t *taskConfig) error {
 	return nil
 }
 
-// testBisectStep runs gclient sync, builds t.fuzzer, and runs the test case, returning the outcome.
+// testBisectStep synchronizes native dependencies, builds t.fuzzer, and runs the test case.
 func testBisectStep(t *taskConfig) (bisectStepResult, error) {
 	fuzzerName := filepath.Base(t.fuzzer)
 	if err := t.syncAndBuildTargets([]string{fuzzerName}); err != nil {

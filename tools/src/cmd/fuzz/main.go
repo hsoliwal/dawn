@@ -535,7 +535,7 @@ func (t *taskConfig) runCmdUnbuffered(name string, args ...string) error {
 
 // atGitHash saves the current git state, checks out a specific hash, executes a
 // function, and then restores the original git state.
-func (t *taskConfig) atGitHash(hash string, fn func() error) error {
+func (t *taskConfig) atGitHash(hash string, fn func() error) (resultErr error) {
 	origRefBytes, err := t.runCmd("git", "rev-parse", "--abbrev-ref", "HEAD")
 	if err != nil {
 		return fmt.Errorf("failed to get original HEAD reference: %w", err)
@@ -551,8 +551,13 @@ func (t *taskConfig) atGitHash(hash string, fn func() error) error {
 
 	defer func() {
 		fmt.Printf("Restoring repository to original state (%s)...\n", origRef)
-		_, _ = t.runCmd("git", "checkout", origRef)
-		_, _ = t.runCmd("gclient", "sync")
+		if _, err := t.runCmd("git", "checkout", origRef); err != nil {
+			resultErr = errors.Join(resultErr, fmt.Errorf("failed to restore %s: %w", origRef, err))
+			return
+		}
+		if err := t.syncDependencies(); err != nil {
+			resultErr = errors.Join(resultErr, fmt.Errorf("failed to restore native dependencies: %w", err))
+		}
 	}()
 
 	fmt.Printf("Syncing repository to hash %s...\n", hash)
@@ -714,7 +719,7 @@ func generateTaskConfig(tm TaskMode, c *mainConfig) (*taskConfig, error) {
 		default:
 			*config.path = filepath.Join(t.build, config.name+fileutils.ExeExt)
 			if tm != TaskModeBisect && tm != TaskModeBisectStep && !fileutils.IsExe(*config.path, t.osWrapper) {
-				return nil, fmt.Errorf("binary '%v' not found at '%v'. Please ensure the project has been built (e.g., with `ninja -C %s %s`)", config.name, *config.path, t.build, config.name)
+				return nil, fmt.Errorf("binary '%v' not found at '%v'. Please build the native project with `cmake --build %s`", config.name, *config.path, t.build)
 			}
 		}
 	}

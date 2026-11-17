@@ -5,7 +5,7 @@
       src="docs/imgs/dawn_logo_notext.png"
       width="50%">
 
-  ![Build Status](https://github.com/google/dawn/actions/workflows/ci.yml/badge.svg?branch=main&event=push)
+  [![Native build status](https://github.com/hsoliwal/dawn/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/hsoliwal/dawn/actions/workflows/ci.yml)
   [![Matrix Space](https://img.shields.io/static/v1?label=Space&message=%23webgpu-dawn&color=blue&logo=matrix)](https://matrix.to/#/#webgpu-dawn:matrix.org)
 </div>
 
@@ -28,7 +28,13 @@ Dawn provides several WebGPU building blocks:
 This is [hsoliwal's fork](https://github.com/hsoliwal/dawn) of
 [google/dawn](https://github.com/google/dawn). It is useful for learning the native
 WebGPU stack, integrating Dawn into a C++ application, and following a request from
-validation through backend execution. The fork retains Dawn Native and Tint while removing browser build paths, Node.js bindings and `dawn_wire` ([browser/Node/Chromium removal](https://github.com/hsoliwal/dawn/pull/9), [Wire removal](https://github.com/hsoliwal/dawn/pull/10), [remaining Emscripten/Node/V8 cleanup](https://github.com/hsoliwal/dawn/pull/12)). These changes do not establish GPU/backend qualification or performance. The build badge above belongs to upstream.
+validation through backend execution. The fork retains Dawn Native and Tint while removing browser build paths, Node.js bindings and `dawn_wire` ([browser/Node/Chromium removal](https://github.com/hsoliwal/dawn/pull/9), [Wire removal](https://github.com/hsoliwal/dawn/pull/10), [remaining Emscripten/Node/V8 cleanup](https://github.com/hsoliwal/dawn/pull/12)). These changes do not establish GPU/backend qualification or performance.
+
+The dependency manifest and build helpers use native CMake inputs without
+Chromium checkout hooks. Android JNI, native resource management, and WebGPU
+operations remain in their original owners. Compatible API names such as
+`CopyTextureForBrowser` describe native GPU operations; they do not launch or
+require a browser.
 
 ### The architecture in one minute
 
@@ -48,9 +54,9 @@ operation follows an identical call stack.
 ### Quickstart: build a local CMake install
 
 First follow the platform prerequisites in [building.md](docs/building.md):
-CMake 3.22+, Git, Python 3, Go 1.23+, a C++20 compiler, and Ninja 1.12+ for the
-example below. Dependency fetching uses the network and may download substantial
-toolchains; review the dependency-license notice in that guide first.
+CMake 3.22+, Git, Python 3, Go 1.26+, a C++20 compiler, and Ninja 1.12+ for the
+example below. Dependency fetching reads the native dependency pins in `DEPS`;
+it does not run Chromium checkout hooks.
 
 ```sh
 git clone https://github.com/hsoliwal/dawn.git

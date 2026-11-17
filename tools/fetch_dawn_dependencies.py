@@ -25,15 +25,14 @@
 # OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 """
-Helper script to download Dawn's source dependencies without the need to
-install depot_tools by manually. This script implements a subset of
-`gclient sync`.
+Download Dawn's pinned native source dependencies directly with Git.
 
 This helps embedders, for example through CMake, get all the sources with
 a single add_subdirectory call (or FetchContent) instead of more complex setups
 
-Note that this script executes blindly the content of DEPS file, run it only on
-a project that you trust not to contain malicious DEPS files.
+Only the native dependency paths selected below are fetched. Chromium checkout
+hooks and transitive browser toolchains are not used. DEPS is executable Python;
+run this script only on a checkout you trust.
 """
 
 import os
@@ -100,6 +99,14 @@ parser.add_argument('--fetch-agility-sdk',
                     action='store_true',
                     default=False,
                     help="Fetch the Agility SDK version pinned in DEPS.")
+parser.add_argument('--fetch-swiftshader',
+                    action='store_true',
+                    default=False,
+                    help="Fetch the native SwiftShader software GPU driver.")
+parser.add_argument('--fetch-mesa',
+                    action='store_true',
+                    default=False,
+                    help="Fetch Mesa and its pinned LLVM/Zstd fuzzing dependencies.")
 
 
 def main(args):
@@ -128,6 +135,14 @@ def main(args):
     ]
     if args.fetch_agility_sdk:
         required_submodules.append('third_party/agility-sdk/src')
+    if args.fetch_swiftshader:
+        required_submodules.append('third_party/swiftshader')
+    if args.fetch_mesa:
+        required_submodules.extend([
+            'third_party/mesa/src',
+            'third_party/llvm-dev',
+            'third_party/zstd',
+        ])
 
     root_dir = Path(args.directory).resolve()
 
@@ -146,7 +161,7 @@ def process_dir(args, dir_path, required_submodules):
         return
 
     log(f"Listing dependencies from {dir_path}")
-    DEPS = open(deps_path).read()
+    DEPS = deps_path.read_text(encoding='utf-8')
 
     ldict = {}
     exec(DEPS, {'Var': Var, 'Str': str}, ldict)
@@ -175,55 +190,49 @@ def process_dir(args, dir_path, required_submodules):
             m[len(submodule) + 1:] for m in required_submodules
             if m.startswith(submodule + "/")
         ]
-        process_dir(args, submodule_path, required_subsubmodules)
+        if required_subsubmodules:
+            process_dir(args, submodule_path, required_subsubmodules)
 
 
 def fetch_git_dependency(args, dep, variables, submodule_path):
     raw_url = dep['url']
     git_url, git_tag = raw_url.format(**variables).rsplit('@', 1)
 
-    # Run git from within the submodule's path (don't use for clone)
-    git = lambda *x: subprocess.run([args.git, '-C', submodule_path, *x],
-                                    capture_output=True)
+    # .git may be a directory (standalone clone) or a file (git submodule).
+    # Every mutating Git command must succeed before CMake can build this pin.
+    def git(*arguments, check=True):
+        return subprocess.run([args.git, '-C', submodule_path, *arguments],
+                              capture_output=True, check=check)
 
     log(f"Fetching dependency '{submodule_path}'")
-    if (submodule_path / ".git").is_dir():
-        # The module was already cloned, but we may need to update it
-        proc = git('rev-parse', 'HEAD')
-        need_update = proc.stdout.decode().strip() != git_tag
-
-        if need_update:
-            # The module was already cloned, but we may need to update it
-            proc = git('cat-file', '-t', git_tag)
-            git_tag_exists = proc.returncode == 0
-
-            if not git_tag_exists:
-                log(f"Updating '{submodule_path}' from '{git_url}'")
-                if args.shallow:
-                    git('fetch', 'origin', git_tag, '--depth', '1')
-                else:
-                    git('fetch', 'origin')
-
-            log(f"Checking out tag '{git_tag}'")
-            git('checkout', git_tag)
+    if (submodule_path / ".git").exists():
+        # A previous interrupted shallow fetch can leave an initialized checkout
+        # without HEAD. Treat that as an incomplete fetch and retry the pin.
+        head = git('rev-parse', '--verify', 'HEAD', check=False)
+        if head.returncode == 0 and head.stdout.decode().strip() == git_tag:
+            return
+        if git('cat-file', '-e', git_tag + '^{commit}', check=False).returncode:
+            log(f"Updating '{submodule_path}' from '{git_url}'")
+            fetch_arguments = ['fetch', git_url, git_tag]
+            if args.shallow:
+                fetch_arguments.extend(['--depth', '1'])
+            git(*fetch_arguments)
     else:
         if args.shallow:
-            log(f"Shallow cloning '{git_url}' at '{git_tag}' into '{submodule_path}'"
-                )
+            log(f"Shallow cloning '{git_url}' at '{git_tag}' into '{submodule_path}'")
+            submodule_path.mkdir(parents=True, exist_ok=True)
             shallow_clone(git, git_url, git_tag)
         else:
             log(f"Cloning '{git_url}' into '{submodule_path}'")
-            subprocess.run([
-                args.git,
-                'clone',
-                '--recurse-submodules',
-                git_url,
-                submodule_path,
-            ],
-                           capture_output=True)
+            subprocess.run([args.git, 'clone', git_url, submodule_path],
+                           capture_output=True, check=True)
 
-        log(f"Checking out tag '{git_tag}'")
-        git('checkout', git_tag)
+    log(f"Checking out tag '{git_tag}'")
+    git('checkout', '--detach', git_tag)
+    current = git('rev-parse', 'HEAD').stdout.decode().strip()
+    expected = git('rev-parse', git_tag + '^{commit}').stdout.decode().strip()
+    if current != expected:
+        raise RuntimeError(f"Dependency '{submodule_path}' did not reach pinned commit {git_tag}")
 
 
 def fetch_cipd_dependency(dep, variables, submodule_path):
@@ -261,7 +270,7 @@ def fetch_cipd_dependency(dep, variables, submodule_path):
 def shallow_clone(git, git_url, git_tag):
     """
     Fetching only 1 commit is not exposed in the git clone API, so we decompose
-    it manually in git init, git fetch, git reset.
+    it into git init and git fetch. The caller checks out and verifies the pin.
     """
     git('init')
     git('fetch', git_url, git_tag, '--depth', '1')
