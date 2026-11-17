@@ -88,7 +88,7 @@ add_custom_target(mesa_copy_zstd DEPENDS
 )
 
 # ---------------------------------------------------------------------------
-# Codegen Actions (49 targets total, mirroring third_party/mesa/BUILD.gn)
+# Codegen Actions (49 targets total)
 # ---------------------------------------------------------------------------
 
 set(_mesa_all_codegen_outputs "")

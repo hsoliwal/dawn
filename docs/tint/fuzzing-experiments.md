@@ -1,5 +1,9 @@
 # Tint Fuzzing Experiments
 
+> **Not available in this fork.** `tools/run fuzz experiment` validates GN
+> arguments and runs `gclient sync`; this fork keeps only the CMake build, so the
+> experiment mode described below needs a Chromium (GN) checkout of Dawn.
+
 The Tint fuzzing experiment/benchmarking framework is designed to
 automate the process of comparing changes to the Tint fuzzers. It
 measures hardware performance, fuzzer coverage percentage rates, and

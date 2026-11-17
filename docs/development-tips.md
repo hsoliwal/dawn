@@ -7,15 +7,11 @@ as a dependency).
 
 Especially useful for any change or refactor that affects multiple backends.
 
-- Use `scripts/standalone-maximal.gclient` instead of `standalone.gclient`.
-- Set the `dawn_maximal = true` and `use_libfuzzer = true` GN args to default to
-  building as many targets as possible given your host OS.
+- Enable every backend your host supports (`DAWN_ENABLE_*` CMake options), and
+  `TINT_BUILD_FUZZERS=ON`, to build as many targets as possible.
 - Build all targets (target `all`, which is the default if none is specified).
 - Develop on Linux or Mac, and set up build directories that cross-compile for
   other OSes (see [building.md](building.md)).
-  - `dawn_maximal = true` is optional but still useful for cross-compile builds.
-- Also note you can run `gn gen --check` to locally run the presubmit check
-  that C++ includes match the build files.
 
 ## Set up your IDE to use clangd
 
@@ -24,10 +20,8 @@ up the development/iteration process, compared with recompiling the project.
 
 - Do the steps above, so that clangd will know how to build most files.
 - Do a full build in each build directory (to create generated files, etc.).
-- Set `"custom_vars": { "checkout_clangd": True }` in `.gclient`
-  (or just use `standalone-maximal.gclient`).
-- Point your IDE to the binary at
-  `third_party/llvm-build/Release+Asserts/bin/clangd`.
+- Configure CMake with `-DCMAKE_EXPORT_COMPILE_COMMANDS=ON`.
+- Point your IDE to a clangd binary (clangd 19 or later).
   - In VSCode: `clangd.path`
 - Configure clangd: Paste the relevant text below into `.clangd` and then update
   the `out/` paths in that file according to your needs.

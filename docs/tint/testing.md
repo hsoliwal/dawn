@@ -22,5 +22,4 @@ Tint has multiple levels of testing:
 * WebGPU Conformance Test Suite (CTS). The WebGPU CTS has both validation and
   execution tests, in the `webgpu:shader` hierarchy.
   See https://github.com/gpuweb/cts
-  All test can be run in Chrome, and many tests can be run via `dawn.node`,
-  the [Dawn bindings for NodeJS](../../src/dawn/node/README.md).
+  This fork has no browser or Node.js runner for the CTS.

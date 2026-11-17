@@ -78,11 +78,7 @@ if(BUILD_SHARED_LIBS)
   target_compile_definitions(dawn_headers INTERFACE "WGPU_SHARED_LIBRARY")
 endif()
 
-if (EMSCRIPTEN)
-  add_library(webgpu_c ALIAS emdawnwebgpu_c)
-else()
-  add_library(webgpu_c ALIAS dawn_headers)
-endif()
+add_library(webgpu_c ALIAS dawn_headers)
 
 ###############################################################################
 # Dawn C++ headers
@@ -106,16 +102,10 @@ dawn_add_library(
         dawn::dawn_headers
 )
 
-if (EMSCRIPTEN)
-  add_library(webgpu_cpp ALIAS emdawnwebgpu_cpp)
-  set(cpp_modules_gen_target emdawnwebgpu_modules)
-  set(cpp_modules_includes "${DAWN_BUILD_GEN_DIR}/src/emdawnwebgpu/include")
-else()
-  add_library(dawncpp ALIAS dawncpp_headers)
-  add_library(webgpu_cpp ALIAS dawncpp_headers)
-  set(cpp_modules_gen_target cpp_modules)
-  set(cpp_modules_includes "${DAWN_BUILD_GEN_DIR}/include")
-endif()
+add_library(dawncpp ALIAS dawncpp_headers)
+add_library(webgpu_cpp ALIAS dawncpp_headers)
+set(cpp_modules_gen_target cpp_modules)
+set(cpp_modules_includes "${DAWN_BUILD_GEN_DIR}/include")
 
 # Dawn c++20 Module Interface
 if(DAWN_SUPPORTS_CXX_MODULES)
@@ -159,18 +149,6 @@ if(DAWN_SUPPORTS_CXX_MODULES)
     DESTINATION "."
   )
 
-  if (EMSCRIPTEN)
-    # Add module interface to emdawnwebgpu_pkg
-    add_custom_target(emdawnwebgpu_pkg_cppmodules
-      COMMAND ${CMAKE_COMMAND} -E make_directory
-        "${CMAKE_BINARY_DIR}/emdawnwebgpu_pkg/webgpu_cpp/include/webgpu/"
-
-      COMMAND ${CMAKE_COMMAND} -E copy
-        ${DAWNCPP_MODULES_GEN_SOURCES}
-        "${CMAKE_BINARY_DIR}/emdawnwebgpu_pkg/webgpu_cpp/include/webgpu/"
-    )
-    add_dependencies(emdawnwebgpu_pkg emdawnwebgpu_pkg_cppmodules)
-  endif()
 endif()
 
 ###############################################################################
@@ -199,9 +177,6 @@ if(DAWN_USE_GLFW)
 endif()
 if (DAWN_BUILD_SAMPLES)
   add_subdirectory(samples)
-endif()
-if (DAWN_BUILD_NODE_BINDINGS)
-  add_subdirectory(node)
 endif()
 
 ###############################################################################

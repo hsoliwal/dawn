@@ -25,17 +25,15 @@ macros:
 
 ## Building
 
-The `tint_wgsl_fuzzer` target can be built with either CMake or GN:
+The `tint_wgsl_fuzzer` target is built with CMake:
 
 - CMake: Define `TINT_BUILD_FUZZERS=1` (pass `-DTINT_BUILD_FUZZERS=1`
   to `cmake`)
-- GN: Define `use_libfuzzer = true` in `args.gn`.
 
 Building `tint_ir_fuzzer` requires additional flags to be set:
 
 - CMake: Define `TINT_BUILD_IR_BINARY=1` (pass
   `-DTINT_BUILD_IR_BINARY=1` to `cmake`)
-- GN: Define `tint_build_ir_binary = true` in `args.gn`.
 
 ### Building Mesa fuzzers
 
@@ -51,32 +49,16 @@ fuzzing pass and passing it to Mesa's software Vulkan driver
   x64 (`linux-amd64`), because the custom Mesa build rules and prebuilt
   dependencies (`third_party/llvm-dev` and `third_party/zstd`) only
   target Linux x86-64.
-- **Vulkan only:** Dawn's custom GN and CMake build rules only build
+- **Vulkan only:** Dawn's CMake build rules only build
   Mesa's software Vulkan driver (Lavapipe). OpenGL and other Mesa
   drivers or APIs are not supported.
-- **No MSan:** Building Mesa with MemorySanitizer (`is_msan = true` in
-  GN or `DAWN_ENABLE_MSAN=1` in CMake) is not supported, as the
+- **No MSan:** Building Mesa with MemorySanitizer (`DAWN_ENABLE_MSAN=1`) is not supported, as the
   prebuilt dependencies are not instrumented for MSan.
 
-1. Add `"checkout_mesa": True` to `custom_vars` in your `.gclient` file
-   (this is disabled by default, including in
-   `scripts/standalone-maximal.gclient`) and sync dependencies:
-
-   ```python
-   solutions = [
-     {
-       ...
-       "custom_vars": {
-         ...
-         "checkout_mesa": True,
-       },
-     },
-   ]
-   ```
-
-   ```bash
-   gclient sync
-   ```
+1. Fetch the Mesa sources with `git submodule update --init --depth 1
+   third_party/mesa/src`. The prebuilt `third_party/llvm-dev` and
+   `third_party/zstd` packages came from Chromium's gclient (CIPD) hooks;
+   this CMake-only fork does not fetch them, so supply them yourself.
 
 2. Enable the Mesa and Vulkan fuzzer build flags in addition to the
    base fuzzer flags above (plus the IR binary flag if building
@@ -86,11 +68,6 @@ fuzzing pass and passing it to Mesa's software Vulkan driver
      `TINT_BUILD_FUZZER_VULKAN_SUPPORT=1` (pass
      `-DTINT_BUILD_MESA=1 -DTINT_BUILD_FUZZER_VULKAN_SUPPORT=1` to
      `cmake`; requires the Clang toolchain).
-   - GN: Define `tint_build_mesa = true` and
-     `tint_build_fuzzer_vulkan_support = true` in `args.gn` (in GN,
-     `tint_build_fuzzer_vulkan_support` defaults to `tint_build_mesa`,
-     but setting both explicitly is required by tools such as
-     `tools/run fuzz experiment`).
 
 ## Running fuzzers
 
@@ -202,9 +179,9 @@ tools/run fuzz run -inputs out/Fuzzer/wgsl_corpus
 
 IR corpus generation requires the `ir_fuzz_as` binary to be present in
 the build directory. This directory is `out/active` by default, but
-can be manually specified via `-build`. The GN target
-`fuzzer_corpus_tools` can be used to build this binary and any of the
-other binaries that the helper tool may need.
+can be manually specified via `-build`. CMake builds it as the
+`tint_cmd_fuzz_ir_as_cmd` target (output name `ir_fuzz_as`) when
+`TINT_BUILD_IR_BINARY=1`.
 
 The corpus generation process for a IR corpus is the same as above,
 except using the `-ir` flag.
@@ -624,22 +601,12 @@ outputting a variety of profiling formats to Graphviz dot files
 
 Because profiling requires symbol information and is going to be doing
 a bunch of call interception, there are some build flags that must be
-enabled and some that must be disabled in your `args.gn`
+enabled and some that must be disabled in your CMake configuration
 
-```gn
-# If not enabled, profiling will still run, the trace will just be
-# empty
-is_debug = true
-
-# Technically will run with sanitizers on, but execution will likely
-# halt early due to the sanitizers triggering on the profiling
-# hooks. These flags are off by default in args.gn, but if you are
-# working with fuzzers regularly, you may have them enabled for your
-# specific build
-is_asan = false
-is_msan = false
-is_<any other san> = false
-
+```sh
+# Debug symbols are required; sanitizers stop execution early under the
+# profiling hooks, so leave them off.
+cmake -DCMAKE_BUILD_TYPE=Debug -DDAWN_ENABLE_ASAN=OFF -DDAWN_ENABLE_MSAN=OFF ...
 ```
 
 ### Example Workflow
