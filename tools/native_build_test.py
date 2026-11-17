@@ -29,6 +29,7 @@
 
 import argparse
 import configparser
+import io
 import json
 import os
 from pathlib import Path
@@ -48,51 +49,43 @@ CMAKE = os.environ.get('DAWN_TEST_CMAKE') or shutil.which('cmake')
 class NativeDependenciesTest(unittest.TestCase):
 
     def setUp(self):
-        self.manifest = {}
-        exec((ROOT / 'DEPS').read_text(), {'Var': fetch.Var}, self.manifest)
+        self.args = fetch.parser.parse_args(['--directory', str(ROOT)])
+        self.urls = fetch.submodule_urls(self.args, ROOT)
 
-    def test_manifest_keeps_native_pins_without_browser_tooling(self):
+    def test_gitlinks_keep_native_pins_without_browser_tooling(self):
         modules = configparser.ConfigParser()
         modules.read(ROOT / '.gitmodules')
         native_sources = {modules[s]['path'] for s in modules.sections()}
-        optional_native = {
-            'third_party/agility-sdk/src',
-            'third_party/direct3d-warp/bin/',
-            'third_party/llvm-dev',
-            'third_party/zstd',
-            'third_party/litert-lm/src',
-            'third_party/litert-lm/data',
-            'third_party/litert-lm/models/gemma4_2b',
-        }
-        self.assertEqual(set(self.manifest['deps']),
-                         native_sources | optional_native)
-        self.assertNotIn('hooks', self.manifest)
-        self.assertNotIn('recursedeps', self.manifest)
-        self.assertNotIn('gclient_gn_args', self.manifest)
+        self.assertFalse((ROOT / 'DEPS').exists())
+        self.assertEqual(set(self.urls), native_sources)
+        self.assertEqual(set(fetch.REQUIRED_SUBMODULES) |
+                         {'third_party/swiftshader', 'third_party/mesa/src'},
+                         native_sources)
+        self.assertFalse(any('gclient-condition' in modules[s]
+                             for s in modules.sections()))
         removed = ('build', 'buildtools', 'testing', 'tools/clang', 'tools/mb',
                    'third_party/catapult', 'third_party/depot_tools',
                    'third_party/partition_alloc', 'third_party/perfetto',
                    'third_party/placeholder_chromium', 'third_party/v8',
                    'third_party/node', 'third_party/emscripten',
                    'third_party/emdawnwebgpu')
-        for path, dep in self.manifest['deps'].items():
+        for path in self.urls:
             self.assertFalse(any(path == prefix or path.startswith(prefix + '/')
                                  for prefix in removed), path)
-            if 'url' in dep:
-                with self.subTest(path=path):
-                    self.assertRegex(dep['url'].rsplit('@', 1)[1],
-                                     r'^[0-9a-f]{40}$')
+            with self.subTest(path=path):
+                self.assertRegex(fetch.pinned_commit(self.args, ROOT, path),
+                                 r'^[0-9a-f]{40}$')
 
     def test_default_fetch_selects_only_native_dependencies(self):
         args = fetch.parser.parse_args(['--directory', str(ROOT)])
         with mock.patch.object(fetch, 'fetch_git_dependency') as git_fetch:
-            with mock.patch.object(fetch, 'fetch_cipd_dependency') as cipd_fetch:
+            with mock.patch.object(fetch, 'fetch_package') as package_fetch:
                 fetch.main(args)
         selected = {
             call.args[3].relative_to(ROOT).as_posix()
             for call in git_fetch.call_args_list
         }
-        self.assertTrue(selected <= self.manifest['deps'].keys())
+        self.assertEqual(selected, set(fetch.REQUIRED_SUBMODULES))
         self.assertTrue({
             'third_party/abseil-cpp',
             'third_party/jinja2',
@@ -100,7 +93,7 @@ class NativeDependenciesTest(unittest.TestCase):
             'third_party/vulkan-headers/src',
             'third_party/webgpu-headers/src',
         } <= selected)
-        cipd_fetch.assert_not_called()
+        package_fetch.assert_not_called()
 
     def test_optional_native_drivers_fetch_their_pinned_dependencies(self):
         args = fetch.parser.parse_args([
@@ -108,24 +101,53 @@ class NativeDependenciesTest(unittest.TestCase):
             '--fetch-agility-sdk'
         ])
         with mock.patch.object(fetch, 'fetch_git_dependency') as git_fetch:
-            with mock.patch.object(fetch, 'fetch_cipd_dependency') as cipd_fetch:
+            with mock.patch.object(fetch, 'fetch_package') as package_fetch:
                 fetch.main(args)
         source_paths = {call.args[3].relative_to(ROOT).as_posix()
                         for call in git_fetch.call_args_list}
         sdk_paths = {call.args[2].relative_to(ROOT).as_posix()
-                     for call in cipd_fetch.call_args_list}
+                     for call in package_fetch.call_args_list}
         self.assertTrue({'third_party/swiftshader', 'third_party/mesa/src'} <= source_paths)
         self.assertEqual(sdk_paths, {'third_party/agility-sdk/src',
                                     'third_party/llvm-dev', 'third_party/zstd'})
 
+    def test_list_reports_selected_source_and_package_pins_without_fetching(self):
+        args = fetch.parser.parse_args([
+            '--directory', str(ROOT), '--list', '--fetch-swiftshader',
+            '--fetch-mesa', '--fetch-agility-sdk'
+        ])
+        with mock.patch.object(fetch, 'fetch_git_dependency') as git_fetch:
+            with mock.patch.object(fetch, 'fetch_package') as package_fetch:
+                with mock.patch('sys.stdout', new_callable=io.StringIO) as output:
+                    fetch.main(args)
+        git_fetch.assert_not_called()
+        package_fetch.assert_not_called()
+        rows = [line.split('\t') for line in output.getvalue().splitlines()]
+        pins = {path: (url, pin) for path, url, pin in rows}
+        self.assertEqual(len(rows), len(pins))
+        self.assertEqual(set(pins), set(self.urls) | {
+            'third_party/agility-sdk/src', 'third_party/llvm-dev', 'third_party/zstd'
+        })
+        for path, url in self.urls.items():
+            self.assertEqual(pins[path], (url, fetch.pinned_commit(args, ROOT, path)))
+        self.assertEqual(pins['third_party/llvm-dev'],
+                         ('infra/3pp/tools/llvm-dev/linux-amd64', 'version:3@22.1.0'))
+        self.assertEqual(pins['third_party/zstd'],
+                         ('infra/3pp/static_libs/libzstd/linux-amd64',
+                          'Lf-seQJdussz81cZXnez5xIxEdkejDRxKumQpHbHMOUC'))
+
+    def test_regular_file_cannot_supply_a_dependency_pin(self):
+        with self.assertRaisesRegex(SystemExit, 'no pinned commit'):
+            fetch.pinned_commit(self.args, ROOT, 'go.mod')
+
     def test_full_clone_does_not_reintroduce_transitive_submodules(self):
         args = argparse.Namespace(git='git', shallow=False)
-        dep = {'url': 'https://example.invalid/native.git@' + 'a' * 40}
+        url, pin = 'https://example.invalid/native.git', 'a' * 40
         with tempfile.TemporaryDirectory() as directory:
             target = Path(directory) / 'native'
             completed = subprocess.CompletedProcess([], 0, stdout=('a' * 40).encode())
             with mock.patch.object(fetch.subprocess, 'run', return_value=completed) as run:
-                fetch.fetch_git_dependency(args, dep, {}, target)
+                fetch.fetch_git_dependency(args, url, pin, target)
         self.assertEqual(run.call_args_list[0].args[0], [
             'git', 'clone', 'https://example.invalid/native.git', target
         ])
@@ -134,7 +156,7 @@ class NativeDependenciesTest(unittest.TestCase):
 
     def test_native_fetch_failures_stop_before_success(self):
         args = argparse.Namespace(git='git', shallow=True)
-        dep = {'url': 'https://example.invalid/native.git@' + 'a' * 40}
+        url, pin = 'https://example.invalid/native.git', 'a' * 40
         for failing_command in ('init', 'fetch', 'checkout'):
             with self.subTest(command=failing_command):
                 with tempfile.TemporaryDirectory() as directory:
@@ -151,12 +173,12 @@ class NativeDependenciesTest(unittest.TestCase):
 
                     with mock.patch.object(fetch.subprocess, 'run', side_effect=run):
                         with self.assertRaises(subprocess.CalledProcessError):
-                            fetch.fetch_git_dependency(args, dep, {}, target)
+                            fetch.fetch_git_dependency(args, url, pin, target)
                     self.assertEqual(commands[-1][3], failing_command)
 
     def test_full_clone_failure_propagates(self):
         args = argparse.Namespace(git='git', shallow=False)
-        dep = {'url': 'https://example.invalid/native.git@' + 'a' * 40}
+        url, pin = 'https://example.invalid/native.git', 'a' * 40
         with tempfile.TemporaryDirectory() as directory:
             target = Path(directory) / 'native'
 
@@ -166,12 +188,12 @@ class NativeDependenciesTest(unittest.TestCase):
 
             with mock.patch.object(fetch.subprocess, 'run', side_effect=clone) as run:
                 with self.assertRaises(subprocess.CalledProcessError):
-                    fetch.fetch_git_dependency(args, dep, {}, target)
+                    fetch.fetch_git_dependency(args, url, pin, target)
             run.assert_called_once()
 
     def test_existing_git_submodule_updates_to_pin_without_recloning(self):
         args = argparse.Namespace(git='git', shallow=True)
-        dep = {'url': 'https://example.invalid/native.git@' + 'a' * 40}
+        url, pin = 'https://example.invalid/native.git', 'a' * 40
         with tempfile.TemporaryDirectory() as directory:
             target = Path(directory)
             (target / '.git').write_text('gitdir: ../modules/native')
@@ -179,7 +201,7 @@ class NativeDependenciesTest(unittest.TestCase):
             after = subprocess.CompletedProcess([], 0, stdout=('a' * 40).encode())
             with mock.patch.object(fetch.subprocess, 'run',
                                    side_effect=[before, after, after, after, after]) as run:
-                fetch.fetch_git_dependency(args, dep, {}, target)
+                fetch.fetch_git_dependency(args, url, pin, target)
             self.assertFalse(any('clone' in call.args[0] for call in run.call_args_list))
             self.assertIn('checkout', run.call_args_list[2].args[0])
 
@@ -197,7 +219,7 @@ class NativeDependenciesTest(unittest.TestCase):
                            check=True, capture_output=True)
             pin = subprocess.check_output(['git', '-C', source, 'rev-parse', 'HEAD'],
                                           text=True).strip()
-            dep = {'url': str(source) + '@' + pin}
+            url = str(source)
             args = argparse.Namespace(git='git', shallow=True)
             real_run = subprocess.run
 
@@ -208,9 +230,9 @@ class NativeDependenciesTest(unittest.TestCase):
 
             with mock.patch.object(fetch.subprocess, 'run', side_effect=interrupted_fetch):
                 with self.assertRaises(subprocess.CalledProcessError):
-                    fetch.fetch_git_dependency(args, dep, {}, target)
+                    fetch.fetch_git_dependency(args, url, pin, target)
             self.assertTrue((target / '.git').exists())
-            fetch.fetch_git_dependency(args, dep, {}, target)
+            fetch.fetch_git_dependency(args, url, pin, target)
             actual = subprocess.check_output(['git', '-C', target, 'rev-parse', 'HEAD'],
                                              text=True).strip()
             self.assertEqual(actual, pin)
@@ -221,12 +243,29 @@ class NativeDependenciesTest(unittest.TestCase):
             nested = root / 'third_party/native'
             nested.mkdir(parents=True)
             (root / 'DEPS').write_text(
-                "deps = {'third_party/native': {'url': 'native@pin'}}")
+                "raise RuntimeError('retired root manifest')")
             (nested / 'DEPS').write_text(
                 "raise RuntimeError('unrequested transitive manifest')")
-            with mock.patch.object(fetch, 'fetch_git_dependency') as git_fetch:
-                fetch.process_dir(None, root, ['third_party/native'])
+            (root / '.gitmodules').write_text(
+                '[submodule "third_party/native"]\n'
+                '\tpath = third_party/native\n'
+                '\turl = https://example.invalid/native.git\n')
+            subprocess.run(['git', '-C', root, 'init'], check=True, capture_output=True)
+            pin = 'a' * 40
+            subprocess.run(['git', '-C', root, 'update-index', '--add', '--cacheinfo',
+                            '160000,' + pin + ',third_party/native'],
+                           check=True, capture_output=True)
+            subprocess.run(['git', '-C', root, '-c', 'user.name=Native build test',
+                            '-c', 'user.email=native-build-test@example.invalid',
+                            'commit', '-m', 'Native gitlink fixture'],
+                           check=True, capture_output=True)
+            args = fetch.parser.parse_args(['--directory', str(root)])
+            with mock.patch.object(fetch, 'REQUIRED_SUBMODULES', ['third_party/native']):
+                with mock.patch.object(fetch, 'fetch_git_dependency') as git_fetch:
+                    fetch.main(args)
             git_fetch.assert_called_once()
+            self.assertEqual(git_fetch.call_args.args,
+                             (args, 'https://example.invalid/native.git', pin, nested))
 
 
 @unittest.skipUnless(CMAKE, 'CMake is required for configuration tests')

@@ -13,7 +13,7 @@ If you are developing Dawn itself, see also
  * `CMake` 3.22 or later
  * Ninja 1.12 (or another build tool supported by CMake)
  * Python 3, for fetching dependencies
- * Go 1.26 or later, as declared by `tools/src/go.mod`: https://go.dev/
+ * Go 1.26 or later, as declared by `go.mod`: https://go.dev/
  * A C++20 compiler
     * Check the platform details below.
 
@@ -69,14 +69,19 @@ python tools/fetch_dawn_dependencies.py
 Use `python tools/fetch_dawn_dependencies.py -h` to know more about the available options. The script
 does not figure out option-dependent requirements automatically.
 
-`DEPS` records native libraries and SDK assets. It has no Chromium build
-checkout, `gclient` configuration, or hooks that recreate removed browser
-directories. Source mirrors hosted on `chromium.googlesource.com` still provide
-some native dependencies; their host name does not introduce a browser runtime.
-The CMake dependency fetcher uses an explicit native dependency list.
+The checkout's gitlinks pin native source commits, and `.gitmodules` records
+their repository URLs. The CMake dependency fetcher uses an explicit native
+dependency list without a `DEPS` file, `gclient` configuration, or recursive
+submodule fetching. Source mirrors hosted on `chromium.googlesource.com` still
+provide some native dependencies; their host name does not introduce a browser
+runtime. Use `python tools/fetch_dawn_dependencies.py --list` to inspect the pins
+without downloading dependencies.
 
 On Windows, configuring CMake with both `DAWN_FETCH_DEPENDENCIES=ON` and
-`DAWN_USE_AGILITY_SDK=ON` downloads the Agility SDK version pinned in `DEPS`.
+`DAWN_USE_AGILITY_SDK=ON` downloads the Agility SDK version pinned in
+`tools/fetch_dawn_dependencies.py`. The same script holds the Linux LLVM/Zstd
+package pins needed by optional Mesa builds. CMake passes `--fetch-swiftshader`
+or `--fetch-mesa` when those native drivers are enabled.
 
 ### Linux dependencies
 

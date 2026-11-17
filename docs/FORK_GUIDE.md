@@ -35,7 +35,7 @@ The checked-out [CMakeLists.txt](../CMakeLists.txt) requires **CMake 3.22 or lat
 
 The [build guide](building.md) also specifies Git, Python 3, Go 1.26+, a C++20 compiler, and Ninja 1.12 or an alternative CMake-supported build tool. This fork builds with CMake, not GN/depot_tools, and has no `dawn.node` target. Platform SDKs, compiler versions and Linux packages are detailed in the guide.
 
-Dependency fetching uses network access for the pinned native dependencies in `DEPS`. Review each dependency's license when distributing native outputs; optional SDK assets retain their own terms.
+Dependency fetching uses network access for native source commits pinned by the checkout's gitlinks, with URLs from `.gitmodules`. Optional binary package pins are in `tools/fetch_dawn_dependencies.py`. Review each dependency's license when distributing native outputs; optional SDK assets retain their own terms.
 
 ## CMake command cheat sheet
 

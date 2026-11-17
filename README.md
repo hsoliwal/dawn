@@ -30,7 +30,7 @@ This is [hsoliwal's fork](https://github.com/hsoliwal/dawn) of
 WebGPU stack, integrating Dawn into a C++ application, and following a request from
 validation through backend execution. The fork retains Dawn Native and Tint while removing browser build paths, Node.js bindings and `dawn_wire` ([browser/Node/Chromium removal](https://github.com/hsoliwal/dawn/pull/9), [Wire removal](https://github.com/hsoliwal/dawn/pull/10), [remaining Emscripten/Node/V8 cleanup](https://github.com/hsoliwal/dawn/pull/12)). These changes do not establish GPU/backend qualification or performance.
 
-The dependency manifest and build helpers use native CMake inputs without
+The pinned submodules and build helpers use native CMake inputs without
 Chromium checkout hooks. Android JNI, native resource management, and WebGPU
 operations remain in their original owners. Compatible API names such as
 `CopyTextureForBrowser` describe native GPU operations; they do not launch or
@@ -55,8 +55,8 @@ operation follows an identical call stack.
 
 First follow the platform prerequisites in [building.md](docs/building.md):
 CMake 3.22+, Git, Python 3, Go 1.26+, a C++20 compiler, and Ninja 1.12+ for the
-example below. Dependency fetching reads the native dependency pins in `DEPS`;
-it does not run Chromium checkout hooks.
+example below. Dependency fetching reads URLs from `.gitmodules` and native
+source pins from the checkout's gitlinks; it does not run Chromium checkout hooks.
 
 ```sh
 git clone https://github.com/hsoliwal/dawn.git

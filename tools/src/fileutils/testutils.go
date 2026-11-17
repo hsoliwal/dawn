@@ -50,8 +50,8 @@ func SetUpFakeDawnRoot(fsWriter oswrapper.FSTestOSWrapper) error {
 		return err
 	}
 
-	deps := filepath.Join(dawnRoot, "DEPS")
-	f, err := fsWriter.Create(deps)
+	marker := filepath.Join(dawnRoot, "go.mod")
+	f, err := fsWriter.Create(marker)
 	if err != nil {
 		return err
 	}

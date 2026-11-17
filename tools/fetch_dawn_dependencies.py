@@ -25,14 +25,16 @@
 # OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 """
-Download Dawn's pinned native source dependencies directly with Git.
+Helper script to download Dawn's source dependencies for a CMake build.
+
+Each source dependency is pinned by its git submodule entry (the gitlink in this
+checkout), and its URL comes from .gitmodules. Optional binary packages for the
+D3D12 Agility SDK and Mesa are pinned below. No dependency manifest is executed,
+and transitive submodules are not fetched.
 
 This helps embedders, for example through CMake, get all the sources with
-a single add_subdirectory call (or FetchContent) instead of more complex setups
-
-Only the native dependency paths selected below are fetched. Chromium checkout
-hooks and transitive browser toolchains are not used. DEPS is executable Python;
-run this script only on a checkout you trust.
+a single add_subdirectory call (or FetchContent) instead of more complex setups.
+Run it from (or point -d at) a git checkout of Dawn: the pinned commits are read from git.
 """
 
 import os
@@ -56,8 +58,8 @@ parser.add_argument('-d',
                     type=str,
                     default="",
                     help="""
-    Working directory, in which we read and apply DEPS files recusively. If not
-    specified, the current working directory is used.
+    Dawn checkout whose pinned dependencies are fetched. If not specified, the
+    current working directory is used.
     """)
 
 parser.add_argument('-g',
@@ -66,7 +68,6 @@ parser.add_argument('-g',
                     default="git",
                     help="""
     Path to the git command used to. By default, git is retrieved from the PATH.
-    You may also use this option to specify extra argument for all calls to git.
     """)
 
 parser.add_argument('-s',
@@ -78,8 +79,6 @@ parser.add_argument('-s',
     requested commit).
     NB: The git server hosting the dependencies must have turned on the
     `uploadpack.allowReachableSHA1InWant` option.
-    NB2: git submodules may not work as expected (but they are not used by Dawn
-    dependencies).
     """)
 parser.add_argument('-ns',
                     '--no-shallow',
@@ -98,7 +97,7 @@ parser.add_argument('-t',
 parser.add_argument('--fetch-agility-sdk',
                     action='store_true',
                     default=False,
-                    help="Fetch the Agility SDK version pinned in DEPS.")
+                    help="Fetch the pinned D3D12 Agility SDK package.")
 parser.add_argument('--fetch-swiftshader',
                     action='store_true',
                     default=False,
@@ -108,95 +107,99 @@ parser.add_argument('--fetch-mesa',
                     default=False,
                     help="Fetch Mesa and its pinned LLVM/Zstd fuzzing dependencies.")
 
+parser.add_argument('--list',
+                    action='store_true',
+                    default=False,
+                    help="Print path, URL and pinned commit of each dependency; fetch nothing.")
+
+# The dependencies needed by the CMake build, as submodule paths.
+REQUIRED_SUBMODULES = [
+    'third_party/abseil-cpp',
+    'third_party/directx-shader-compiler/src',
+    'third_party/directx-headers/src',
+    'third_party/glfw3/src',
+    'third_party/jinja2',
+    'third_party/EGL-Registry/src',
+    'third_party/OpenGL-Registry/src',
+    'third_party/libprotobuf-mutator/src',
+    'third_party/protobuf',
+    'third_party/markupsafe',
+    'third_party/glslang/src',
+    'third_party/google_benchmark/src',
+    'third_party/googletest/src',
+    'third_party/spirv-headers/src',
+    'third_party/spirv-tools/src',
+    'third_party/vulkan-headers/src',
+    'third_party/vulkan-loader/src',
+    'third_party/vulkan-utility-libraries/src',
+    'third_party/webgpu-headers/src',
+]
+
+# The D3D12 Agility SDK is an archive, not a git repository.
+AGILITY_SDK_PATH = 'third_party/agility-sdk/src'
+AGILITY_SDK_PACKAGE = 'chromium/third_party/agility-sdk'
+AGILITY_SDK_VERSION = 'version:2@1.722.0-preview'
+
+# Mesa's Linux build uses these native binary packages rather than submodules.
+MESA_PACKAGES = [
+    ('third_party/llvm-dev', 'infra/3pp/tools/llvm-dev/linux-amd64',
+     'version:3@22.1.0'),
+    ('third_party/zstd', 'infra/3pp/static_libs/libzstd/linux-amd64',
+     'Lf-seQJdussz81cZXnez5xIxEdkejDRxKumQpHbHMOUC'),
+]
+
 
 def main(args):
-    # The dependencies that we need to pull from the DEPS files.
-    # Dependencies of dependencies are prefixed by their ancestors.
-    required_submodules = [
-        'third_party/abseil-cpp',
-        'third_party/directx-shader-compiler/src',
-        'third_party/directx-headers/src',
-        'third_party/glfw3/src',
-        'third_party/jinja2',
-        'third_party/EGL-Registry/src',
-        'third_party/OpenGL-Registry/src',
-        'third_party/libprotobuf-mutator/src',
-        'third_party/protobuf',
-        'third_party/markupsafe',
-        'third_party/glslang/src',
-        'third_party/google_benchmark/src',
-        'third_party/googletest/src',
-        'third_party/spirv-headers/src',
-        'third_party/spirv-tools/src',
-        'third_party/vulkan-headers/src',
-        'third_party/vulkan-loader/src',
-        'third_party/vulkan-utility-libraries/src',
-        'third_party/webgpu-headers/src',
-    ]
-    if args.fetch_agility_sdk:
-        required_submodules.append('third_party/agility-sdk/src')
+    root_dir = Path(args.directory).resolve()
+    urls = submodule_urls(args, root_dir)
+    required_submodules = list(REQUIRED_SUBMODULES)
     if args.fetch_swiftshader:
         required_submodules.append('third_party/swiftshader')
     if args.fetch_mesa:
-        required_submodules.extend([
-            'third_party/mesa/src',
-            'third_party/llvm-dev',
-            'third_party/zstd',
-        ])
-
-    root_dir = Path(args.directory).resolve()
-
-    process_dir(args, root_dir, required_submodules)
-
-
-def process_dir(args, dir_path, required_submodules):
-    """
-    Install dependencies for the provided directory by processing the DEPS file
-    that it contains (if it exists).
-    Recursively install dependencies in sub-directories that are created by
-    cloning dependencies.
-    """
-    deps_path = dir_path / 'DEPS'
-    if not deps_path.is_file():
-        return
-
-    log(f"Listing dependencies from {dir_path}")
-    DEPS = deps_path.read_text(encoding='utf-8')
-
-    ldict = {}
-    exec(DEPS, {'Var': Var, 'Str': str}, ldict)
-
-    deps = ldict.get('deps')
-    variables = ldict.get('vars', {})
-
-    if deps is None:
-        log(f"WARNING: DEPS file '{deps_path}' does not define a 'deps' variable"
-            )
-        return
-
+        required_submodules.append('third_party/mesa/src')
     for submodule in required_submodules:
-        if submodule not in deps:
-            continue
-        submodule_path = dir_path / Path(submodule)
-        dep = deps[submodule]
-
-        if dep.get('dep_type') == 'cipd':
-            fetch_cipd_dependency(dep, variables, submodule_path)
+        if submodule not in urls:
+            sys.exit(f"{submodule} has no entry in {root_dir / '.gitmodules'}")
+        commit = pinned_commit(args, root_dir, submodule)
+        if args.list:
+            print(f"{submodule}\t{urls[submodule]}\t{commit}")
         else:
-            fetch_git_dependency(args, dep, variables, submodule_path)
+            fetch_git_dependency(args, urls[submodule], commit, root_dir / submodule)
+    packages = []
+    if args.fetch_agility_sdk:
+        packages.append((AGILITY_SDK_PATH, AGILITY_SDK_PACKAGE, AGILITY_SDK_VERSION))
+    if args.fetch_mesa:
+        packages.extend(MESA_PACKAGES)
+    for path, package, version in packages:
+        if args.list:
+            print(f"{path}\t{package}\t{version}")
+        else:
+            fetch_package(package, version, root_dir / path)
 
-        # Recursive call
-        required_subsubmodules = [
-            m[len(submodule) + 1:] for m in required_submodules
-            if m.startswith(submodule + "/")
-        ]
-        if required_subsubmodules:
-            process_dir(args, submodule_path, required_subsubmodules)
+
+def submodule_urls(args, root_dir):
+    """Map each submodule path in .gitmodules to its URL."""
+    proc = subprocess.run([args.git, 'config', '-f', str(root_dir / '.gitmodules'), '--get-regexp',
+                           r'^submodule\..*\.(path|url)$'], capture_output=True, text=True, check=True)
+    names, urls = {}, {}
+    for line in proc.stdout.splitlines():
+        key, value = line.split(' ', 1)
+        name, field = key[len('submodule.'):].rsplit('.', 1)
+        (names if field == 'path' else urls)[name] = value
+    return {path: urls[name] for name, path in names.items() if name in urls}
 
 
-def fetch_git_dependency(args, dep, variables, submodule_path):
-    raw_url = dep['url']
-    git_url, git_tag = raw_url.format(**variables).rsplit('@', 1)
+def pinned_commit(args, root_dir, submodule):
+    """The commit the checkout pins for a submodule (its gitlink)."""
+    proc = subprocess.run([args.git, '-C', str(root_dir), 'ls-tree', 'HEAD', '--', submodule],
+                          capture_output=True, text=True)
+    fields = proc.stdout.split()
+    if proc.returncode != 0 or len(fields) < 3 or fields[1] != 'commit':
+        sys.exit(f"no pinned commit for {submodule}: run from a git checkout of Dawn")
+    return fields[2]
+
+
+def fetch_git_dependency(args, git_url, git_tag, submodule_path):
 
     # .git may be a directory (standalone clone) or a file (git submodule).
     # Every mutating Git command must succeed before CMake can build this pin.
@@ -235,42 +238,33 @@ def fetch_git_dependency(args, dep, variables, submodule_path):
         raise RuntimeError(f"Dependency '{submodule_path}' did not reach pinned commit {git_tag}")
 
 
-def fetch_cipd_dependency(dep, variables, submodule_path):
-    for package in dep['packages']:
-        name = package['package']
-        # TODO(crbug.com/519934394): Append package['platform'] to the package name when present.
-        assert 'platform' not in package
-        version = package['version']
-        assert isinstance(version, Var)
-        version = variables[version.name]
 
-        # CIPD dependencies are archives rather than Git checkouts. Keep a local version stamp in
-        # the ignored dependency directory so repeated runs can skip downloading the same DEPS
-        # version. The stamp is written only after extraction succeeds.
-        stamp = submodule_path / ('.dawn-' + name.replace('/', '-') +
-                                  '-version')
-        if stamp.is_file() and stamp.read_text() == version:
-            continue
+def fetch_package(name, version, package_path):
+    # Keep a local version stamp in the ignored dependency directory so repeated runs can skip
+    # downloading the same version. The stamp is written only after extraction succeeds.
+    stamp = package_path / ('.dawn-' + name.replace('/', '-') + '-version')
+    if stamp.is_file() and stamp.read_text() == version:
+        return
 
-        log(f"Fetching CIPD dependency '{name}' at '{version}'")
-        if submodule_path.exists():
-            shutil.rmtree(submodule_path)
-        submodule_path.mkdir(parents=True)
-        url = ('https://chrome-infra-packages.appspot.com/dl/' + name + '/+/' +
-               urllib.parse.quote(version, safe=''))
-        with tempfile.TemporaryDirectory() as temp_dir:
-            archive = Path(temp_dir) / 'package.zip'
-            urllib.request.urlretrieve(url, archive)
-            with zipfile.ZipFile(archive) as package_zip:
-                package_zip.extractall(submodule_path)
+    log(f"Fetching package '{name}' at '{version}'")
+    if package_path.exists():
+        shutil.rmtree(package_path)
+    package_path.mkdir(parents=True)
+    url = ('https://chrome-infra-packages.appspot.com/dl/' + name + '/+/' +
+           urllib.parse.quote(version, safe=''))
+    with tempfile.TemporaryDirectory() as temp_dir:
+        archive = Path(temp_dir) / 'package.zip'
+        urllib.request.urlretrieve(url, archive)
+        with zipfile.ZipFile(archive) as package_zip:
+            package_zip.extractall(package_path)
 
-        stamp.write_text(version)
+    stamp.write_text(version)
 
 
 def shallow_clone(git, git_url, git_tag):
     """
     Fetching only 1 commit is not exposed in the git clone API, so we decompose
-    it into git init and git fetch. The caller checks out and verifies the pin.
+    it manually in git init, git fetch, git checkout.
     """
     git('init')
     git('fetch', git_url, git_tag, '--depth', '1')
@@ -279,22 +273,6 @@ def shallow_clone(git, git_url, git_tag):
 def log(msg):
     """Just makes it look good in the CMake log flow."""
     print(f"-- -- {msg}")
-
-
-class Var:
-    """
-    Mock Var class, that the content of DEPS files assume to exist when they
-    are exec-ed.
-    """
-
-    def __init__(self, name):
-        self.name = name
-
-    def __add__(self, text):
-        return self.name + text
-
-    def __radd__(self, text):
-        return text + self.name
 
 
 if __name__ == "__main__":
