@@ -8,9 +8,7 @@ templates to generate the code. This is similar to the model/view separation in 
 Generators are based on [generator_lib.py](../../generator/generator_lib.py) which provides
 facilities for integrating in build systems and using Jinja2. Templates can be found
 in [`generator/templates`](../../generator/templates) and the generated files are in
-`out/<Debug/Release/foo>/gen/src` when building Dawn in standalone. Generated files can also be
-found in [Chromium's code
-search](https://source.chromium.org/chromium/chromium/src/+/main:out/Debug/gen/third_party/dawn/src/).
+`out/<Debug/Release/foo>/gen/src` in a standalone native build.
 
 ## Dawn "JSON API" generators
 
@@ -53,8 +51,8 @@ The basic schema is that every entry is a thing with a `"category"` key what det
 sub-schema to apply to that thing. Categories and their sub-shema are defined below. Several parts
 of the schema use the concept of "record" which is a list of "record members" which are a
 combination of a type, a name and other metadata. For example the list of arguments of a function
-is a record. The list of structure members is a record. This combined concept is useful for the
-dawn_wire generator to generate code for structure and function calls in a very similar way.
+is a record. The list of structure members is a record. The native header, wrapper, proc-table and validation generators all reuse this record
+representation.
 
 Most items and sub-items can include a list of `"tags"`, which, if specified, conditionally includes
 the item if any of its tags appears in the `enabled_tags` configuration passed to `parse_json`.
@@ -86,9 +84,7 @@ schema:
    be set to the name of another member in the same record that will contain the length of the
    array (this is heavily used in the `fooCount` `foos` pattern in the API).
  - `"optional"` (default to false) a boolean that says whether this member is optional. Member
-   records can be optional if they are pointers (otherwise dawn_wire will always try to dereference
-   them), objects (otherwise dawn_wire will always try to encode their ID and crash), or if they
-   have a `"default"` key. Optional pointers and objects will always default to `nullptr` (unless
+   records can be optional when they are pointers, objects, or have a `"default"` key. Optional pointers and objects will always default to `nullptr` (unless
    `"no_default"` is set to `true`).
  - `"default"` (optional) a number or string. If set the record member will use that value as
    default value. Depending on the member's category it can be a number, a string containing a
@@ -97,15 +93,10 @@ schema:
      if a zero-valued enum (usually called `Undefined`) is passed in, Dawn applies the default
      value specified here. See `WithTrivialFrontendDefaults()` in `api_structs_defaults.h` for how
      this works.
- - `"wire_is_data_only"` (default to false) a boolean that says whether it is safe to directly
-   return a pointer of this member that is pointing to a piece of memory in the transfer buffer
-   into dawn_wire. To prevent TOCTOU attacks, by default in dawn_wire we must ensure every single
-   value returned to dawn_native a copy of what's in the wire, so `"wire_is_data_only"` is set to
-   true only when the member is data-only and don't impact control flow.
 
 **`"native"`** native types that can be referenced by name in other things.
- - `"wire transparent"` (defaults to true) a boolean that indicates whether the native type should
-   be transparent (serialized as is) on the wire.
+ - The legacy `"wire transparent"` annotation may still occur in `dawn.json`, but this
+   fork no longer generates or builds the Wire client/server library.
 
 **`"typedef"`** (usually only used for gradual deprecations):
  - `"type"`: the name of the things this is a typedef for.

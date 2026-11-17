@@ -13,7 +13,7 @@
 
 Dawn is an open-source and cross-platform implementation of the [WebGPU](https://webgpu.dev) standard.
 More precisely it implements [`webgpu.h`](https://github.com/webgpu-native/webgpu-headers/blob/main/webgpu.h) that is a one-to-one mapping with the WebGPU IDL.
-Dawn is meant to be integrated as part of a larger system and is the underlying implementation of WebGPU in Chromium.
+Upstream Dawn is integrated into Chromium. This fork instead targets native applications: Chromium's GN build, browser/WebAssembly and Node.js targets, and the Dawn Wire client/server library have been removed.
 
 Dawn provides several WebGPU building blocks:
  - **WebGPU C/C++ headers** that applications and other building blocks use.
@@ -26,15 +26,9 @@ Dawn provides several WebGPU building blocks:
 ## Start here in this fork
 
 This is [hsoliwal's fork](https://github.com/hsoliwal/dawn) of
-[google/dawn](https://github.com/google/dawn). Its maintained build path is native CMake:
-Chromium browser, Node.js, Emscripten, GN, and the `dawn_wire` client/server
-layer have been removed. Native `webgpu.h`, GPU backends, and Tint remain. It is useful for learning the native
+[google/dawn](https://github.com/google/dawn). It is useful for learning the native
 WebGPU stack, integrating Dawn into a C++ application, and following a request from
-validation through backend execution. At the reviewed fork default
-[`62fa085`](https://github.com/hsoliwal/dawn/commit/62fa0852b8dec9966d9621f2dd6e7aea51f1a01d),
-comparison with upstream found no fork-only implementation commits. The changes
-on this documentation branch are onboarding material, not a new graphics backend
-or a support/performance claim. The build badge above belongs to upstream.
+validation through backend execution. The fork retains Dawn Native and Tint while removing browser build paths, Node.js bindings and `dawn_wire` ([browser/Node/Chromium removal](https://github.com/hsoliwal/dawn/pull/9), [Wire removal](https://github.com/hsoliwal/dawn/pull/10), [remaining Emscripten/Node/V8 cleanup](https://github.com/hsoliwal/dawn/pull/12)). These changes do not establish GPU/backend qualification or performance. The build badge above belongs to upstream.
 
 ### The architecture in one minute
 
@@ -47,7 +41,8 @@ or a support/performance claim. The build badge above belongs to upstream.
 | Generated code | Headers, wrappers and dispatch derived from inputs | [Code-generation guide](docs/dawn/codegen.md) |
 
 A useful reading path is application → WebGPU API → native validation → backend
-→ driver/GPU. Tint handles shader translation without a browser or wire process. This is a component map, not a promise that every
+→ driver/GPU. Native dispatch is direct in this fork; the Wire client/server
+layer is removed. Tint handles shader translation. This is a component map, not a promise that every
 operation follows an identical call stack.
 
 ### Quickstart: build a local CMake install
