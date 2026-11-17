@@ -1,10 +1,8 @@
 # Building Dawn
 
-Generally, Dawn's tooling and system dependencies are set by Chromium.
-Therefore Chromium's build environment, provided by `GN` and `depot_tools`,
-is Dawn's primary build environment. However, Dawn can be built as a
-standalone C++ project, often with alternative build generators and C++
-compilers, as described below.
+Dawn builds as a standalone C++ project with CMake. This fork has no
+Chromium (`GN`, `depot_tools`, `gclient`) build and no browser (Emscripten,
+emdawnwebgpu) or Node.js (`dawn.node`) targets.
 
 If you are developing Dawn itself, see also
 [development-tips.md](development-tips.md).
@@ -12,16 +10,12 @@ If you are developing Dawn itself, see also
 ## System requirements
 
  * Git
- * `depot_tools` in your path
- * A build generator, one of:
-    * `GN`, provided by `depot_tools`
-    * `CMake` 3.22 or later
+ * `CMake` 3.22 or later
  * Ninja 1.12 (or another build tool supported by CMake)
  * Python 3, for fetching dependencies
  * Go 1.23 or later: https://go.dev/
  * A C++20 compiler
-    * When using GN, the default compiler will be provided automatically.
-    * Otherwise, check the platform details below.
+    * Check the platform details below.
 
 - Linux
   - CPU:
@@ -54,58 +48,25 @@ If you are developing Dawn itself, see also
     - arm64 support is experimental
   - Windows SDK 10.0.26100.x or a later version.
   - C++20 compiler:
-    - Clang, as provided by GN. This is the primary supported compiler.
+    - Clang 19 or later.
     - MSVC 19.41, or Visual Studio 2022 v17.11 or later.
       Note: Dawn is tested daily with MSVC 19.43 or VS 2022 v17.13
 
 
 ## Get the code and its dependencies
 
-### Using `depot_tools`
-
-Dawn uses the Chromium build system and dependency management so you need to [install depot_tools]
-and add it to the PATH.
-
-[install depot_tools]:
-http://commondatastorage.googleapis.com/chrome-infra-docs/flat/depot_tools/docs/html/depot_tools_tutorial.html#_setting_up
+Use `tools/fetch_dawn_dependencies.py` to clone the dependencies' repositories:
 
 ```sh
 # Clone the repo as "dawn"
 git clone https://dawn.googlesource.com/dawn dawn && cd dawn
 
-# Bootstrap the gclient configuration
-cp scripts/standalone.gclient .gclient
-
-# Fetch external dependencies and toolchains with gclient
-gclient sync
-```
-
-The standalone build dependencies includes Microsoft Direct 3D WARP with the following terms:
-
-```
-The Microsoft Direct 3D WARP software is available as part of this download and is
-licensed to you by Microsoft Corporation (or one of its affiliates). The Microsoft
-Direct 3D WARP software is governed by an end user license agreement (“EULA”)
-which can be found at this link or successor links as applicable:
-https://www.nuget.org/packages/Microsoft.Direct3D.WARP/1.0.20-preview/License?.
-By downloading the Microsoft Direct 3D WARP software you agree to the EULA terms.
-```
-
-### Without `depot_tools`
-
-If you cannot or do not want to depend on `depot_tools`, you may use the
-`tools/fetch_dawn_dependencies.py` to clone the dependencies' repositories:
-
-```sh
-# Clone the repo as "dawn"
-git clone https://dawn.googlesource.com/dawn dawn && cd dawn
-
-# Fetch dependencies (loosely equivalent to gclient sync)
+# Fetch dependencies
 python tools/fetch_dawn_dependencies.py
 ```
 
-Use `python tools/fetch_dawn_dependencies.py -h` to know more about the available options. Contrary
-to `depot_tools`, this scripts does not figure out option-dependent requirements automatically.
+Use `python tools/fetch_dawn_dependencies.py -h` to know more about the available options. The script
+does not figure out option-dependent requirements automatically.
 
 On Windows, configuring CMake with both `DAWN_FETCH_DEPENDENCIES=ON` and
 `DAWN_USE_AGILITY_SDK=ON` downloads the Agility SDK version pinned in `DEPS`.
@@ -123,14 +84,10 @@ The following packages are needed to build Dawn. (Package names are the Ubuntu n
 * `mesa-common-dev`
 * `libx11-xcb-dev`
 * `pkg-config`
-* `nodejs`
-* `npm`
 
 ```sh
-sudo apt-get install libfuse2 libxrandr-dev libxinerama-dev libxcursor-dev libxkbcommon-dev libxi-dev mesa-common-dev libx11-xcb-dev pkg-config nodejs npm
+sudo apt-get install libfuse2 libxrandr-dev libxinerama-dev libxcursor-dev libxkbcommon-dev libxi-dev mesa-common-dev libx11-xcb-dev pkg-config
 ```
-
-Note, `nodejs` and `npm` are only needed if building `dawn.node`.
 
 
 ## Build Dawn
@@ -153,24 +110,6 @@ cmake ../..
 make # -j N for N-way parallel build
 ```
 
-### Compiling using gn + ninja
-
-```sh
-mkdir -p out/Debug
-gn gen out/Debug
-autoninja -C out/Debug
-```
-
-The most common GN build option is `is_debug=true/false`; otherwise
-`gn args out/Debug --list` shows all the possible options.
-
-On macOS you'll want to add the `use_system_xcode=true` in most cases.
-(and if you're a googler please get XCode from go/xcode).
-
-To generate a Microsoft Visual Studio solution, add `ide=vs2022` and
-`ninja-executable=<dawn parent directory>\dawn\third_party\ninja\ninja.exe`.
-The .sln file will be created in the output directory specified.
-
 For CMake builds, you can enable installation with the `DAWN_ENABLE_INSTALL` option
 and use `find_package(Dawn)` in your CMake project to discover Dawn and link with
 the `dawn::webgpu_dawn` target. Please see [Quickstart with CMake](./quickstart-cmake.md)
@@ -178,37 +117,9 @@ for step-by-step instructions.
 
 ### Cross-Compilation
 
-Cross-compilation is provided on a best-effort basis, primarily for the purpose
-of compilation checks during local Dawn development. It only supports Clang.
-It may not always work, and the resulting binaries are not guaranteed to work.
-
-1.  Add your target OS to the `target_os` array in `.gclient`. Or, use
-    `standalone-maximal.gclient` and follow the instructions in it.
-    This will enable downloading toolchains and any target-specific Dawn DEPS.
-    - Windows: ~16GB.
-    - Mac: ~4GB.
-    - Android: ~2.5GB.
-1.  `gclient sync`.
-1.  Create a new `out/*` directory for each target build with the relevant GN
-    args. The following configurations have been tested:
-
-    - `target_os = "mac"` `target_cpu = "arm64"`/`"x64"` on Linux hosts
-    - `target_os = "win"` `target_cpu = "x64"` on Linux and Mac hosts
-        - On Mac hosts, many Windows files can't build using Siso remote builds.
-          Use `autoninja --offline` (or `autoninja -k=0 ; autoninja --offline`
-          to first compile everything possible with Siso, then compile the rest
-          locally). See <https://crbug.com/446124900>.
-    - `target_os = "android` `target_cpu = "arm64"` on Linux hosts (note below)
-
-For background, see also
-[this guide](https://chromium.googlesource.com/chromium/src/+/main/docs/win_cross.md).
-
-#### For Android targets (Linux hosts)
-
-**Cross-compilation for Android as described above works to compile targets, but
-the resulting binaries have not been tested.** If you want to run them you *may*
-need to set up an Android Chromium build (which contains Dawn) and build Dawn
-targets (like `dawn_unittests`, `dawn_end2end_tests`) in the Chromium build.
+Cross-compile with a CMake toolchain file. The `mobile-android` job of
+[`.github/workflows/ci.yml`](../.github/workflows/ci.yml) shows the Android NDK
+configuration for arm64-v8a, armeabi-v7a and x86.
 
 ### Using ccache for CMake builds
 
@@ -354,38 +265,3 @@ impact, since the standard SDK doesn't ship with these libraries, so nothing
 else should be using them, but the Homebrew version of llvm will not have all of
 Apple's patches, so may be incompatible in subtle ways if these libraries do get
 used somehow.
-
-#### Using hermetic builds
-
-It should be possible to use the same hermetic toolchain that the bots
-use for dev builds of the fuzzers, since the bots build and run the fuzzer fine.
-
-Unfortunately the standard setup on a dev machine is 'mostly' hermetic. It does
-use the hermetic version clang and other tools, but it also does use some of the
-system framework stuff that comes from XCode, and that is where the build issues
-come in from, when trying to build/run the fuzzers.
-
-There is some support for getting a truly hermetic build on a dev machine,
-<https://source.chromium.org/chromium/chromium/src/+/main:third_party/dawn/src/cmake/HermeticXcode/>,
-but that has not been tested with building the fuzzers, and probably needs work
-to be a drop-in solution here.
-
-### Reproducing bot specific environments on Windows + CMake
-
-When investigating build issues being seen by CI/CQ it is sometimes necessary
-to replicate the exact environment from a builder/bot for local debugging.
-
-As part of a Dawn checkout the toolchains used by the builders should already be
-checked out in your repo. For Windows, using CMake, to use them instead of the
-system installed toolchain, there is a script supplied to set up the
-environment.
-
-Instead of using the system batch file to set up the environment, i.e.
-
-```sh
-C:\Program Files\Microsoft Visual Studio\2022\Community\VC\Auxiliary\Build\vcvars64.bat
-```
-use the appropriate script from `third_party\depot_tools\win_toolchain`, i.e.
-```sh
- C:\src\dawn\third_party\depot_tools\win_toolchain\vs_files\68a20d6dee\Windows Kits\10\bin\SetEnv.cmd
-```

@@ -1,6 +1,6 @@
 # Quickstart With CMake
 
-This document is designed to allow you to build Dawn with CMake and link to it from other CMake projects. If you're planning to work on Dawn specifically, please use `gclient` and `depot_tools`. It ensures
+This document is designed to allow you to build Dawn with CMake and link to it from other CMake projects.
 that you always get the right dependencies and compilers.
 
 ## Prerequisites
@@ -30,7 +30,7 @@ $ cmake -S . -B out/Release -DDAWN_FETCH_DEPENDENCIES=ON -DDAWN_ENABLE_INSTALL=O
 -- Build files have been written to: ${PWD}/out/Release
 ```
 
-- `DAWN_FETCH_DEPENDENCIES=ON` uses a Python script `fetch_dawn_dependencies.py` as a less tedious alternative to setting up depot_tools and fetching dependencies via `gclient`.
+- `DAWN_FETCH_DEPENDENCIES=ON` uses a Python script `fetch_dawn_dependencies.py` to fetch the dependencies the CMake build needs.
 - `DAWN_ENABLE_INSTALL=ON` configures the project to install binaries, headers and cmake configuration files in a directory of your choice. This allows other projects to discover Dawn in CMake and link with it.
 
 Now you can build Dawn:

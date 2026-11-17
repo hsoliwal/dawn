@@ -208,7 +208,6 @@ jobs:
           cmake -G Ninja -S . -B out/host \
             -DDAWN_BUILD_PROTOBUF=ON \
             -DDAWN_BUILD_SAMPLES=OFF \
-            -DDAWN_BUILD_NODE=OFF \
             -DDAWN_ENABLE_VULKAN=OFF \
             -DDAWN_ENABLE_METAL=OFF \
             -DDAWN_ENABLE_D3D12=OFF \
@@ -318,7 +317,6 @@ jobs:
           cmake -G Ninja -S . -B out/host \
             -DDAWN_BUILD_PROTOBUF=ON \
             -DDAWN_BUILD_SAMPLES=OFF \
-            -DDAWN_BUILD_NODE=OFF \
             -DDAWN_ENABLE_VULKAN=OFF \
             -DDAWN_ENABLE_METAL=OFF \
             -DDAWN_ENABLE_D3D12=OFF \

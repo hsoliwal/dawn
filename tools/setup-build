@@ -31,7 +31,7 @@ set -e # Fail on any error.
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd )"
 ROOT_DIR="$( cd "$SCRIPT_DIR/.." >/dev/null 2>&1 && pwd )"
 
-POSSIBLE_BUILD_SYSTEMS="[gn|cmake]"
+POSSIBLE_BUILD_SYSTEMS="[cmake]"
 POSSIBLE_BUILD_TYPES="[debug|release]"
 POSSIBLE_BUILD_ARCHS="[native|x86]"
 BUILD_FUZZER=""
@@ -39,7 +39,6 @@ BUILD_FUZZER=""
 BUILD_SYSTEM=""
 BUILD_TYPE=""
 BUILD_ARCH=""
-FORCE=""
 VERBOSE=""
 SISO="1"
 SHARED=""
@@ -51,17 +50,14 @@ ANDROID_PLATFORM="android-28"
 USE_GCC_RUNTIME=0
 
 function show_usage() {
-  echo "setup-build [-f] $POSSIBLE_BUILD_SYSTEMS $POSSIBLE_BUILD_TYPES $POSSIBLE_BUILD_ARCHS [fuzz|fuzzer]"
+  echo "setup-build $POSSIBLE_BUILD_SYSTEMS $POSSIBLE_BUILD_TYPES $POSSIBLE_BUILD_ARCHS [fuzz|fuzzer]"
   echo
-  echo "Creates a build directory in <dawn>/out using either GN or CMake, then"
+  echo "Creates a build directory in <dawn>/out using CMake, then"
   echo "updates the '<dawn>/out/active' symlink to point to the build directory."
   echo
   echo "Options:"
   echo "  -h, --help    Print this help, then exit"
   echo "  -v, --verbose Print the generate command"
-  echo "  -f, --force   Force rewrite of args.gn with specified options,"
-  echo "                even if args.gn exists"
-  echo "  gn            Create GN build configuration"
   echo "  cmake         Create CMake build configuration"
   echo "  release       Make a release build"
   echo "  debug         Make a debug build"
@@ -114,9 +110,6 @@ function set_build_arch() {
 for arg in "$@"; do
   lowered_arg=$(echo "$arg" | tr '[:upper:]' '[:lower:]') # lowercase
   case $lowered_arg in
-    "gn")
-      set_build_system $lowered_arg
-    ;;
     "cmake")
       set_build_system $lowered_arg
     ;;
@@ -136,9 +129,6 @@ for arg in "$@"; do
     ;;
     "fuzz" | "fuzzer")
       BUILD_FUZZER=1
-    ;;
-    "--force" | "-f")
-      FORCE=1
     ;;
     "install")
       INSTALL=1
@@ -181,10 +171,6 @@ if [[ -z "$BUILD_TYPE" ]]; then
   show_usage "build type $POSSIBLE_BUILD_TYPES required"
 fi
 
-if [[ ( -n "$UBSAN" ) && ( "$BUILD_SYSTEM-$BUILD_TYPE" == "gn-debug" ) ]]; then
-  show_usage "the gn build does not support ubsan with debug builds: use a release build instead"
-fi
-
 if [[ -n "$ANDROID_NDK" ]]; then
   if [[ "$BUILD_SYSTEM" != "cmake" ]]; then
     show_usage "the Android build only works with cmake"
@@ -222,51 +208,6 @@ function generate() {
 }
 
 case $BUILD_SYSTEM in
-  "gn")
-    GN_ARGS=""
-    GN_OPTIONS=""
-    GN_OPTIONS+=' --add-export-compile-commands=//*'
-    case $BUILD_TYPE in
-      "debug")
-        GN_ARGS+="is_debug=true"
-      ;;
-      "release")
-        GN_ARGS+="is_debug=false"
-      ;;
-      *)
-        show_usage "invalid build type '$BUILD_TYPE'"
-      ;;
-    esac
-    case $BUILD_ARCH in
-      "")
-      ;;
-      "x86")
-        GN_ARGS+=" target_cpu=\"x86\""
-      ;;
-      *)
-        show_usage "invalid build architecture '$BUILD_ARCH'"
-      ;;
-    esac
-    if [[ -n "$BUILD_FUZZER" ]]; then
-        GN_ARGS+=" use_libfuzzer=true"
-        GN_ARGS+=" tint_build_ir_binary=true"
-    fi
-    if [[ -n "$SISO" ]]; then
-        GN_ARGS+=" use_siso=true"
-        GN_ARGS+=" use_remoteexec=true"
-    else
-        GN_ARGS+=" use_siso=false"
-    fi
-    if [[ -n "$UBSAN" ]]; then
-        GN_ARGS+=" is_ubsan=true"
-    fi
-    GN_ARGS+=" use_clang_modules=false"
-    if [[ -z "$FORCE" && -f "$ROOT_DIR/out/$BUILD_DIR/args.gn" ]]; then
-      generate "gn" "gen" $GN_OPTIONS "out/active" # keep existing args
-    else
-      generate "gn" "gen" $GN_OPTIONS "out/active" "--args=$GN_ARGS"
-    fi
-  ;;
   "cmake")
     CXX_FLAGS=()
     C_FLAGS=()

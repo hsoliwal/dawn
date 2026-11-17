@@ -65,6 +65,9 @@ set(DAWN_TEMPLATE_DIR "${DAWN_GENERATOR_DIR}/templates" CACHE PATH "Directory th
 
 # Emscripten.cmake toolchain sets this variable to `0`; otherwise, it's undefined, so set it to 1.
 set_if_not_defined(EMSCRIPTEN 0 "1 if building with Emscripten")
+if (EMSCRIPTEN)
+  message(FATAL_ERROR "Browser builds (Emscripten, emdawnwebgpu) were removed from this fork; build Dawn natively.")
+endif()
 
 ################################################################################
 # Configuration options
@@ -168,7 +171,6 @@ option(DAWN_TARGET_MACOS "Manually link Apple core frameworks" ${TARGET_MACOS})
 
 option(DAWN_BUILD_SAMPLES "Enables building Dawn's samples" ${BUILD_SAMPLES})
 option(DAWN_BUILD_TESTS "Enables building Dawn's tests" ${BUILD_TESTS})
-option(DAWN_BUILD_NODE_BINDINGS "Enables building Dawn's NodeJS bindings" OFF)
 option(DAWN_ENABLE_SWIFTSHADER "Enables building Swiftshader as part of the build and Vulkan adapter discovery" OFF)
 option(DAWN_BUILD_BENCHMARKS "Build Dawn benchmarks" OFF)
 option(DAWN_BUILD_PROTOBUF "Build the protobuf dependencies" ON)
@@ -197,7 +199,6 @@ set_if_not_defined(DAWN_KHRONOS_DIR "${DAWN_THIRD_PARTY_DIR}/khronos" "Directory
 set_if_not_defined(DAWN_SWIFTSHADER_DIR "${DAWN_THIRD_PARTY_DIR}/swiftshader" "Directory in which to find swiftshader")
 set_if_not_defined(DAWN_PROTOBUF_DIR "${DAWN_THIRD_PARTY_DIR}/protobuf" "Directory in which to find protobuf")
 set_if_not_defined(DAWN_LPM_DIR "${DAWN_THIRD_PARTY_DIR}/libprotobuf-mutator/src" "Directory in which to find libprotobuf")
-set_if_not_defined(DAWN_EMDAWNWEBGPU_DIR "${DAWN_THIRD_PARTY_DIR}/emdawnwebgpu" "Directory in which to find Dawn specific Emscripten bindings")
 set_if_not_defined(DAWN_GOOGLETEST_DIR "${DAWN_THIRD_PARTY_DIR}/googletest/src" "Directory in which to find googletest")
 set_if_not_defined(DAWN_EGL_REGISTRY_DIR "${DAWN_THIRD_PARTY_DIR}/EGL-Registry/src" "Directory in which to find EGL-Registry")
 set_if_not_defined(DAWN_OPENGL_REGISTRY_DIR "${DAWN_THIRD_PARTY_DIR}/OpenGL-Registry/src" "Directory in which to find OpenGL-Registry")
@@ -286,11 +287,6 @@ option(TINT_ENABLE_BREAK_IN_DEBUGGER "Enable tint::debugger::Break()" OFF)
 option(TINT_CHECK_CHROMIUM_STYLE "Check for [chromium-style] issues during build" OFF)
 option(TINT_RANDOMIZE_HASHES "Randomize the hash seed value to detect non-deterministic output" OFF)
 
-# Dependencies for DAWN_BUILD_NODE_BINDINGS
-set_if_not_defined(NODE_ADDON_API_DIR "${DAWN_THIRD_PARTY_DIR}/node-addon-api" "Directory in which to find node-addon-api")
-set_if_not_defined(NODE_API_HEADERS_DIR "${DAWN_THIRD_PARTY_DIR}/node-api-headers" "Directory in which to find node-api-headers")
-set_if_not_defined(WEBGPU_IDL_PATH "${DAWN_THIRD_PARTY_DIR}/gpuweb/webgpu.idl" "Path to the webgpu.idl definition file")
-set_if_not_defined(GO_EXECUTABLE "go" "Golang executable for running the IDL generator")
 
 message(STATUS "Build type...........: ${CMAKE_BUILD_TYPE}")
 message(STATUS "C++ compiler.........: ${CMAKE_CXX_COMPILER}")
@@ -338,7 +334,6 @@ message(STATUS "Dawn build and use DXC: ${DAWN_USE_BUILT_DXC}")
 message(STATUS "Dawn enable DXC asserts in non-debug builds: ${DAWN_DXC_ENABLE_ASSERTS_IN_NDEBUG}")
 message(STATUS "Dawn target MacOS: ${TARGET_MACOS}")
 message(STATUS "Dawn build samples: ${DAWN_BUILD_SAMPLES}")
-message(STATUS "Dawn build Node bindings: ${DAWN_BUILD_NODE_BINDINGS}")
 message(STATUS "Dawn build Swiftshader: ${DAWN_ENABLE_SWIFTSHADER}")
 message(STATUS "Dawn build benchmarks: ${DAWN_BUILD_BENCHMARKS}")
 message(STATUS "Dawn build protobuf: ${DAWN_BUILD_PROTOBUF}")
@@ -372,7 +367,6 @@ message(STATUS "Dawn Khronos dir: ${DAWN_KHRONOS_DIR}")
 message(STATUS "Dawn Swiftshader dir: ${DAWN_SWIFTSHADER_DIR}")
 message(STATUS "Dawn Protobuf dir: ${DAWN_PROTOBUF_DIR}")
 message(STATUS "Dawn LPM dir: ${DAWN_LPM_DIR}")
-message(STATUS "Dawn Emdawnwebgpu dir: ${DAWN_EMDAWNWEBGPU_DIR}")
 message(STATUS "Dawn Spir-Tools dir: ${DAWN_SPIRV_TOOLS_DIR}")
 message(STATUS "Dawn Spirv-Headers dir: ${DAWN_SPIRV_HEADERS_DIR}")
 message(STATUS "Dawn Glslang dir: ${DAWN_GLSLANG_DIR}")
@@ -380,10 +374,6 @@ message(STATUS "Dawn Vulkan Headers dir: ${DAWN_VULKAN_HEADERS_DIR}")
 message(STATUS "Dawn Vulkan Utility Libraries dir: ${DAWN_VULKAN_UTILITY_LIBRARIES_DIR}")
 message(STATUS "")
 
-message(STATUS "Node Addon API dir: ${NODE_ADDON_API_DIR}")
-message(STATUS "Node API Headers dir: ${NODE_API_HEADERS_DIR}")
-message(STATUS "Webgpu IDL path: ${WEBGPU_IDL_PATH}")
-message(STATUS "Go exe: ${GO_EXECUTABLE}")
 message(STATUS "")
 
 if (TINT_BUILD_FUZZER_VULKAN_SUPPORT AND NOT TINT_BUILD_FUZZERS)
@@ -509,11 +499,8 @@ add_subdirectory(src/tint)
 
 set(BUILD_SHARED_LIBS ${BUILD_SHARED_LIBS_SAVED})
 
-if (DAWN_ENABLE_D3D11 OR DAWN_ENABLE_D3D12 OR DAWN_ENABLE_METAL OR DAWN_ENABLE_NULL OR DAWN_ENABLE_DESKTOP_GL OR DAWN_ENABLE_OPENGLES OR DAWN_ENABLE_VULKAN OR EMSCRIPTEN)
+if (DAWN_ENABLE_D3D11 OR DAWN_ENABLE_D3D12 OR DAWN_ENABLE_METAL OR DAWN_ENABLE_NULL OR DAWN_ENABLE_DESKTOP_GL OR DAWN_ENABLE_OPENGLES OR DAWN_ENABLE_VULKAN)
     add_subdirectory(generator)
-    # Note that we must add Emscripten directory first to ensure the correct
-    # headers will be exported upwards.
-    add_subdirectory(src/emdawnwebgpu)
     add_subdirectory(src/dawn)
     add_subdirectory(src/dawn/fuzzers)
 endif()
@@ -536,19 +523,6 @@ add_custom_target(tint-format
 if (DAWN_EMIT_COVERAGE)
   add_subdirectory(tools/src/cmd/turbo-cov)
 
-  # The tint-generate-coverage target generates a lcov.info file at the project
-  # root, holding the code coverage for all the tint_unitests.
-  # This can be used by tools such as VSCode's Coverage Gutters extension to
-  # visualize code coverage in the editor.
-  get_filename_component(CLANG_BIN_DIR ${CMAKE_C_COMPILER} DIRECTORY)
-  set(PATH_WITH_CLANG "${CLANG_BIN_DIR}:$ENV{PATH}")
-  add_custom_target(tint-generate-coverage
-    COMMAND ${CMAKE_COMMAND} -E env PATH=${PATH_WITH_CLANG} vpython3 ./tools/code_coverage/coverage.py tint_unittests -b ${CMAKE_BINARY_DIR} -o ${TINT_ROOT_SOURCE_DIR}/coverage_report --format lcov --no-compile -c "$<TARGET_FILE:tint_unittests>"
-    COMMAND ${CMAKE_COMMAND} -E copy ${TINT_ROOT_SOURCE_DIR}/coverage_report/linux/coverage.lcov ${TINT_ROOT_SOURCE_DIR}/lcov.info
-    DEPENDS tint_unittests
-    WORKING_DIRECTORY ${TINT_ROOT_SOURCE_DIR}
-    COMMENT "Generating tint coverage data"
-    VERBATIM)
 endif()
 
 if (DAWN_BUILD_MONOLITHIC_LIBRARY AND DAWN_ENABLE_INSTALL)

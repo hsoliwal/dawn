@@ -9,33 +9,41 @@ permissions:
   contents: read
 
 jobs:
-  build-wasm:
+  version:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 5
     outputs:
-      PKG_VERSION: ${{ steps.build.outputs.PKG_VERSION }}
+      PKG_VERSION: ${{ steps.version.outputs.PKG_VERSION }}
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           persist-credentials: false
-      - name: Build Emscripten Package
-        id: build
+      - name: Release version and notes
+        id: version
+        env:
+          REPOSITORY: ${{ github.repository }}
         run: |
-          GITHUB_REPOSITORY="${{ github.repository }}" GITHUB_REF_NAME="${GITHUB_REF_NAME}" .github/workflows/package-emdawnwebgpu.sh
-      - name: Upload WASM Artifacts
+          # Version format: vYYYYMMDD.HHMMSS or vYYYYMMDD.HHMMSS-FORKOWNER.dawn.BRANCHNAME
+          VERSION_DATETIME=$(git show -s --date=format:'%Y%m%d.%H%M%S' --format=%cd)
+          VERSION_SUFFIX=${REPOSITORY/\//.}.${GITHUB_REF_NAME}
+          if [[ "$VERSION_SUFFIX" != "google.dawn.main" ]]; then
+            PKG_VERSION=v${VERSION_DATETIME}-${VERSION_SUFFIX}
+          else
+            PKG_VERSION=v${VERSION_DATETIME}
+          fi
+          echo "PKG_VERSION=${PKG_VERSION}" >> "$GITHUB_OUTPUT"
+          printf 'Dawn release %s at revision %s.\n' "$PKG_VERSION" "$(git rev-parse HEAD)" > RELEASE_INFO.md
+      - name: Upload release notes
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: emdawnwebgpu
-          path: |
-            ${{ steps.build.outputs.REMOTE_PORT_FILE }}
-            ${{ steps.build.outputs.PKG_FILE }}
-            RELEASE_INFO.md
+          name: release-info
+          path: RELEASE_INFO.md
 
   build-native:
     uses: ./.github/workflows/ci.yml
 
   publish:
-    needs: [build-wasm, build-native]
+    needs: [version, build-native]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -47,13 +55,13 @@ jobs:
 
       - name: Display Downloaded Files
         run: |
-          mv artifacts/emdawnwebgpu/RELEASE_INFO.md .
+          mv artifacts/release-info/RELEASE_INFO.md .
           ls -R artifacts
 
       - name: Upload to GitHub Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAG_NAME: ${{ needs.build-wasm.outputs.PKG_VERSION }}
+          TAG_NAME: ${{ needs.version.outputs.PKG_VERSION }}
         run: |
           gh release create "$TAG_NAME" \
             --title "$TAG_NAME" \
@@ -62,8 +70,7 @@ jobs:
             artifacts/Dawn-*/Dawn-*.tar.gz \
             artifacts/dawn-android-*/dawn-android-*.tar.gz \
             artifacts/dawn-apple-*/dawn-apple-*.xcframework.tar.gz \
-            artifacts/dawn-headers-*/dawn-headers-*.tar.gz \
-            artifacts/emdawnwebgpu/*
+            artifacts/dawn-headers-*/dawn-headers-*.tar.gz
 
   alert-on-failure:
     needs: publish

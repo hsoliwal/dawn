@@ -10,7 +10,7 @@ Choose a route:
 
 - **Understand the code:** read the component map below, then [Dawn overview](dawn/overview.md).
 - **Link an application:** follow [Quickstart with CMake](quickstart-cmake.md), including its adapter example and `dawn::webgpu_dawn` link target.
-- **Develop Dawn:** use the [build guide](building.md) and its recommended Chromium/depot_tools dependency workflow.
+- **Develop Dawn:** use the [build guide](building.md) and its CMake dependency workflow.
 - **Investigate shaders:** start with [Tint tests](tint/testing.md) and [src/tint](../src/tint).
 - **Check GPU/backend coverage:** consult [support.md](support.md); a successful compile does not establish device support.
 
@@ -57,11 +57,10 @@ cmake --install out/Release --prefix install/Release
 | --- | --- |
 | Integrate a consumer | `find_package(Dawn REQUIRED)` and link `dawn::webgpu_dawn`; see the full quickstart |
 | Inspect build options | `cmake -LA -N out/Release` after successful configuration |
-| Use the main GN workflow | Follow dependency setup in [building.md](building.md), then `gn gen out/Debug` and `autoninja -C out/Debug` |
 | Inspect the revision | `git rev-parse HEAD` |
 | Review a docs-only edit | `git diff --check` and `git diff --stat` |
 
-Do not mix generators or toolchain configurations in one output directory. The dependency-fetch script is not equivalent to all of gclient's option-dependent setup.
+Do not mix generators or toolchain configurations in one output directory. The dependency-fetch script does not resolve option-dependent setup.
 
 ## Tests: choose the evidence you need
 
@@ -71,7 +70,6 @@ Do not mix generators or toolchain configurations in one output directory. The d
 | Wire behavior? | Wire unit tests | Every native driver/backend combination |
 | Native execution? | Dawn end-to-end tests | All GPUs or operating systems |
 | Shader translation? | Tint unit and end-to-end tests | Whole-application correctness |
-| WebGPU conformance? | [Standalone CTS runner](standalone_cts_runner.md) or documented dawn.node route | A passing subset is not a full conformance result |
 | Speed? | [Performance tests](dawn/testing.md#dawn-perf-tests) | Comparable results without controlled settings |
 
 Dawn's CMake test build is optional. For a dedicated single-config test tree, after the same prerequisites and dependency review:
