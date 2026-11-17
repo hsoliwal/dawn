@@ -38,13 +38,11 @@ ComboRenderBundleEncoderDescriptor::ComboRenderBundleEncoderDescriptor() {
     descriptor->colorFormats = &cColorFormats[0];
 }
 
-#if !DAWN_PLATFORM_IS(EMSCRIPTEN)
 void ComboRenderBundleEncoderDescriptor::SetUsesResourceTable(bool use) {
     DAWN_ASSERT(cResourceTable.nextInChain == nullptr);
     cResourceTable.nextInChain = nextInChain;
     nextInChain = &cResourceTable;
     cResourceTable.usesResourceTable = use;
 }
-#endif  // !DAWN_PLATFORM_IS(EMSCRIPTEN)
 
 }  // namespace dawn::utils

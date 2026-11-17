@@ -35,7 +35,6 @@
   dawn_add_library(<name>
     [FORCE_STATIC|FORCE_SHARED|FORCE_OBJECT]
     [HEADER_ONLY]
-    [ENABLE_EMSCRIPTEN]
     [UTILITY_TARGET           <target>]
     [HEADERS                  <header>...]
     [PRIVATE_HEADERS          <header>...]
@@ -48,8 +47,6 @@
     If none is provided, ``BUILD_SHARED_LIBS`` will control the library type.
   * ``HEADER_ONLY``: The library only contains headers (or templates) and contains
     no compilation steps. Mutually exclusive with ``FORCE_STATIC``.
-  * ``ENABLE_EMSCRIPTEN``: Enables the library target when building with
-    Emscripten. By default, targets are not built with Emscripten.
   * ``UTILITY_TARGET``: If specified, all libraries and executables made by the
     Dawn library API will privately link to this target. This may be used to
     provide things such as project-wide compilation flags or similar.
@@ -64,7 +61,7 @@
 function(dawn_add_library name)
   set(kwargs)
   cmake_parse_arguments(PARSE_ARGV 1 arg
-    "FORCE_STATIC;FORCE_SHARED;FORCE_OBJECT;HEADER_ONLY;ENABLE_EMSCRIPTEN"
+    "FORCE_STATIC;FORCE_SHARED;FORCE_OBJECT;HEADER_ONLY"
     "UTILITY_TARGET"
     "HEADERS;PRIVATE_HEADERS;SOURCES;DEPENDS;PRIVATE_DEPENDS")
 
@@ -72,11 +69,6 @@ function(dawn_add_library name)
     message(FATAL_ERROR
       "Unparsed arguments for dawn_add_library: "
       "${arg_UNPARSED_ARGUMENTS}")
-  endif ()
-
-  # Skip targets that shouldn't be built with Emscripten.
-  if (EMSCRIPTEN AND NOT arg_ENABLE_EMSCRIPTEN)
-    return()
   endif ()
 
   if (arg_HEADER_ONLY AND arg_FORCE_STATIC)

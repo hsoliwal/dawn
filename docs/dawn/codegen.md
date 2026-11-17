@@ -22,10 +22,9 @@ regular template dir).
 
 At this time it is used to generate:
 
- - the Dawn, Emscripten, and upstream webgpu-native `webgpu.h` C header
- - the Dawn and Emscripten `webgpu_cpp.h` C++ wrapper over the C header
+ - the Dawn and upstream webgpu-native `webgpu.h` C header
+ - the Dawn `webgpu_cpp.h` C++ wrapper over the C header
  - libraries that implements `webgpu.h` by calling in a static or `thread_local` proc table
- - the [Emscripten](https://emscripten.org/) WebGPU binding implementation
  - a GMock version of the API with its proc table for testing
  - validation helper functions for dawn_native
  - the definition of dawn_native's proc table
@@ -59,7 +58,7 @@ dawn_wire generator to generate code for structure and function calls in a very 
 
 Most items and sub-items can include a list of `"tags"`, which, if specified, conditionally includes
 the item if any of its tags appears in the `enabled_tags` configuration passed to `parse_json`.
-This is used to include and exclude various items for Dawn, Emscripten, or upstream header
+This is used to include and exclude various items for Dawn or upstream header
 variants. Tags are applied in the "parse_json" step ([rather than
 later](https://docs.google.com/document/d/1fBniVOxx3-hQbxHMugEPcQsaXaKBZYVO8yG9iXJp-fU/edit?usp=sharing)):
 this has the benefit of automatically catching when, for a particular tag configuration, an
@@ -68,10 +67,9 @@ included item references an excluded item.
 When used on enum values, `"tags"` may add an additional prefix to the enum value. This is to
 implement [implementation-specific ranges of
 enums](https://github.com/webgpu-native/webgpu-headers/issues/214). All compat enums are to start
-at `0x0002_0000`, Emscripten enums are to start at `0x0004_0000`, and all Dawn enums are to start
-at `0x0005_0000`. Use of `"compat"`, `"emscripten"`, or `"dawn"` tags will add these values,
-respectively. So, an enum with value `"3"` but tag `"emscripten"` will actually use value
-`0x0002_0003`. Multi-implementation native enums start at `0x0001_0000`, so this value is added if
+at `0x0002_0000` and all Dawn enums are to start at `0x0005_0000`. Use of `"compat"` or `"dawn"`
+tags will add these values, respectively. So, an enum with value `"3"` but tag `"compat"` will
+actually use value `0x0002_0003`. Multi-implementation native enums start at `0x0001_0000`, so this value is added if
 the `"native"` tag is present and no other value-impacting tag is applied.
 
 Items (such as objects, structures, enums, bitmasks, functions, callbacks, and callback infos) as well as object methods and enum/bitmask values can also include a `"stable_version"` field, specified via the `addins` mechanism in [`dawn_version.json`](../../src/dawn/dawn_version.json). This is a monotonically increasing integer version number corresponding to a date with the format `YYYYMMDDPP`, where `PP` is an additional two-digit identifier in case multiple patches land on the same day. Given a particular version, if the version is `>=` an API piece's `"stable_version"`, Dawn guarantees that the API exists and works to the best of our ability. For objects, the top-level `"stable_version"` indicates when the object itself was stably introduced, i.e. when its `AddRef` and `Release` methods (and usually `SetLabel`) were considered stable. Individual object methods (`"object::method"`) also have their own `"stable_version"` entry since they can be introduced at a later time. Similarly, enums and bitmasks have both a top-level `"stable_version"` and individual `"enum::value"` / `"bitmask::value"` entries for each of their values.
@@ -116,12 +114,8 @@ schema:
  - `"values"` an array of enum values. Each value is a dictionary containing:
    - `"name"` a string
    - `"value"` a number that can be decimal or hexadecimal
-   - `"jsrepr"` (optional) a string to allow overriding how this value map to Javascript for the
-     Emscripten bits
    - `"valid"` (defaults to true) a boolean that controls whether the dawn_native validation
      utilities will consider this enum value valid.
- - `"emscripten_no_enum_table"` (optional) if true, skips generating an enum table in
-   `library_webgpu_enum_tables.js`
 
 **`"bitmask"`** an `uint32_t`-based bitmask. It is similar to **`"enum"`** but can be output
   differently.

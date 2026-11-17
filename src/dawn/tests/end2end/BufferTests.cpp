@@ -1430,17 +1430,6 @@ TEST_P(BufferTests, CreateErrorBuffer) {
     buffer = device.CreateErrorBuffer(&desc);
     ASSERT_EQ(buffer, nullptr);
 
-    wgpu::DawnBufferDescriptorErrorInfoFromWireClient ext;
-    ext.outOfMemory = true;
-    desc.nextInChain = &ext;
-
-    desc.mappedAtCreation = false;
-    ASSERT_DEVICE_ERROR(buffer = device.CreateErrorBuffer(&desc));
-    ASSERT_NE(buffer, nullptr);
-
-    desc.mappedAtCreation = true;
-    buffer = device.CreateErrorBuffer(&desc);
-    ASSERT_EQ(buffer, nullptr);
 }
 
 // Test that mapping an OOM buffer fails gracefully

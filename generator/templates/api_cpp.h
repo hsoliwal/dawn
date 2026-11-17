@@ -30,12 +30,6 @@
 {% set api = API.lower() %}
 {% set CAPI = metadata.c_prefix %}
 
-{% if 'dawn' in enabled_tags %}
-    #ifdef __EMSCRIPTEN__
-    #error "Do not include this header. Use the headers provided by Emdawnwebgpu instead."
-    #endif
-{% endif %}
-
 {% set PREFIX = "" if not c_namespace else c_namespace.SNAKE_CASE() + "_" %}
 #ifndef {{PREFIX}}{{API}}_CPP_H_
 #define {{PREFIX}}{{API}}_CPP_H_

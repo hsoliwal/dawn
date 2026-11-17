@@ -26,11 +26,6 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 {% set API = metadata.api.upper() %}
 
-{% if 'dawn' in enabled_tags %}
-    #ifdef __EMSCRIPTEN__
-    #error "Do not include this header. Use the headers provided by Emdawnwebgpu instead."
-    #endif
-{% endif %}
 
 #ifndef {{API}}_CPP_CHAINED_STRUCT_H_
 #define {{API}}_CPP_CHAINED_STRUCT_H_

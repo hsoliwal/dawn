@@ -104,7 +104,6 @@ def concat_names(*names):
 def _validate_and_get_tags(json_data):
     allowed_tags = {
         'dawn',
-        'emscripten',
         'native',
         'deprecated',
         'art',
@@ -123,7 +122,7 @@ def _item_is_enabled(enabled_tags, json_data):
     if tags is None: return True
 
     # Strip 'art_experimental' for non-Art targets so it doesn't cause
-    # the item to be excluded from C++/Emscripten builds.
+    # the item to be excluded from C++ builds.
     if not ('art_experimental' in enabled_tags):
         original_tags_empty = not tags
         tags = [tag for tag in tags if tag not in ('art_experimental')]
@@ -198,24 +197,11 @@ class EnumType(Type):
             prefix = 0
 
             if 'dawn' in tags:
-                # Dawn-only or Dawn+Emscripten
                 assert prefix == 0
                 prefix = 0x0005_0000
-            elif 'emscripten' in tags:
-                # Emscripten-only
-                assert prefix == 0
-                prefix = 0x0004_0000
 
             if prefix == 0 and 'native' in tags:
                 prefix = 0x0001_0000
-
-            if 'deprecated' not in tags:
-                # Emscripten implements some Dawn extensions, and some upstream things that
-                # aren't in Dawn yet.
-                if 'emscripten' in tags and 'dawn' not in tags:
-                    assert value_name.startswith('emscripten'), name
-                else:
-                    assert not value_name.startswith('emscripten'), name
 
             value += prefix
 
@@ -426,12 +412,6 @@ class StructureType(Record, Type):
 
     def __init__(self, is_enabled, name, json_data):
         tags = _validate_and_get_tags(json_data)
-        if tags == ['emscripten']:
-            if name != 'INTERNAL_HAVE_EMDAWNWEBGPU_HEADER':
-                assert name.startswith('emscripten'), name
-        else:
-            assert not name.startswith('emscripten'), name
-
         Record.__init__(self, name)
         json_data_override = {}
         if 'members' in json_data:

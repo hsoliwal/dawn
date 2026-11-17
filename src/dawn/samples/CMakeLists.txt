@@ -36,20 +36,17 @@ set(sample_util_depends
     dawn::dawn_wgpu_utils
     dawn::partition_alloc
 )
-if (NOT EMSCRIPTEN)
-    list(APPEND sample_util_depends
-        dawn::dawn_test_utils
-        dawn::dawn_proc
-        dawn::dawn_glfw
-        dawn::dawn_native
-        glfw
-    )
-endif ()
+list(APPEND sample_util_depends
+    dawn::dawn_test_utils
+    dawn::dawn_proc
+    dawn::dawn_glfw
+    dawn::dawn_native
+    glfw
+)
 
 dawn_add_library(
     dawn_sample_utils
     FORCE_STATIC
-    ENABLE_EMSCRIPTEN
     HEADERS
         "SampleUtils.h"
     SOURCES
@@ -60,49 +57,32 @@ dawn_add_library(
 
 ###############################################################################
 # Dawn samples
-#   - Note that not all samples are currently buildable for Emscripten.
 ###############################################################################
 
 function(Sample)
     cmake_parse_arguments(PARSE_ARGV 0 arg
-        "ENABLE_EMSCRIPTEN"
+        ""
         "NAME"
         "SOURCES"
     )
 
-    # Skip targets that shouldn't be built with Emscripten.
-    if (EMSCRIPTEN AND NOT arg_ENABLE_EMSCRIPTEN)
-        return()
-    endif ()
-
     add_executable(${arg_NAME} ${arg_SOURCES})
-    if (EMSCRIPTEN)
-        set_target_properties(${arg_NAME} PROPERTIES
-            SUFFIX ".html")
-        target_link_options(${arg_NAME} PUBLIC
-            # We need JSPI for Future implementation.
-            "-sJSPI"
-        )
-    endif()
     target_link_libraries(${arg_NAME} PUBLIC dawn::dawn_sample_utils)
     common_compile_options(${arg_NAME})
 endfunction()
 
 Sample(
     NAME HelloTriangle
-    ENABLE_EMSCRIPTEN
     SOURCES "HelloTriangle.cpp"
 )
 
 Sample(
     NAME ComputeBoids
-    ENABLE_EMSCRIPTEN
     SOURCES "ComputeBoids.cpp"
 )
 
 Sample(
     NAME Animometer
-    ENABLE_EMSCRIPTEN
     SOURCES "Animometer.cpp"
 )
 

@@ -138,16 +138,14 @@ elseif(APPLE)
     )
 endif()
 
-if (NOT EMSCRIPTEN)
-    list(APPEND private_headers
-        "ExternalTextureParams.h"
-        "WGPUDeviceCallbackInfos.h"
-    )
-    list(APPEND sources
-        "ExternalTextureParams.cpp"
-        "WGPUDeviceCallbackInfos.cpp"
-    )
-endif()
+list(APPEND private_headers
+    "ExternalTextureParams.h"
+    "WGPUDeviceCallbackInfos.h"
+)
+list(APPEND sources
+    "ExternalTextureParams.cpp"
+    "WGPUDeviceCallbackInfos.cpp"
+)
 
 if (CMAKE_SYSTEM_NAME STREQUAL "Android")
     find_library(log_lib log)
@@ -175,7 +173,6 @@ list(APPEND conditional_private_depends
 
 dawn_add_library(
     dawn_common
-    ENABLE_EMSCRIPTEN
     UTILITY_TARGET dawn_internal_config
     PRIVATE_HEADERS
         ${private_headers}
