@@ -36,8 +36,10 @@ cd tools/src
 go test ./cmd/fuzz
 ```
 
-The `chromium_test_compat` helper translates existing native test flags to
-GTest output options. It does not require a Chromium checkout or browser.
+Use native GTest options such as `--gtest_filter` and `--gtest_output` directly.
+Chromium test-launcher argument translation and its compatibility helper have
+been removed. The generator regression checks require Jinja2 in the selected
+Python environment.
 
 ## Native benchmarks
 

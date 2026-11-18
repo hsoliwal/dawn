@@ -29,6 +29,7 @@
 
 import argparse
 import configparser
+import importlib.util
 import io
 import json
 import os
@@ -280,7 +281,8 @@ class NativeConfigurationTest(unittest.TestCase):
     def test_browser_configurations_fail_explicitly(self):
         for setting in ('-DEMSCRIPTEN=ON',
                         '-DCMAKE_SYSTEM_NAME=Emscripten',
-                        '-DDAWN_BUILD_NODE_BINDINGS=ON'):
+                        '-DDAWN_BUILD_NODE_BINDINGS=ON',
+                        '-DTINT_CHECK_CHROMIUM_STYLE=ON'):
             with self.subTest(setting=setting):
                 result = self.configure(setting)
                 self.assertNotEqual(result.returncode, 0)
@@ -292,6 +294,7 @@ class NativeConfigurationTest(unittest.TestCase):
                 result = self.configure('-DCMAKE_SYSTEM_NAME=' + system,
                                         '-DEMSCRIPTEN=OFF',
                                         '-DDAWN_BUILD_NODE_BINDINGS=OFF',
+                                        '-DTINT_CHECK_CHROMIUM_STYLE=OFF',
                                         '-DDAWN_ENABLE_WEBGPU_ON_WEBGPU=ON')
                 self.assertEqual(result.returncode, 0, result.stderr)
 
@@ -430,6 +433,165 @@ class NativeToolsTest(unittest.TestCase):
         self.assertEqual(result.returncode, 1)
         self.assertIn('Go is not installed or not in PATH', result.stderr)
         self.assertFalse(self.arguments.exists())
+
+
+@unittest.skipUnless(importlib.util.find_spec('jinja2'),
+                     'Jinja2 is required for native generator tests')
+class NativeGeneratorTest(unittest.TestCase):
+
+    def setUp(self):
+        self.directory = tempfile.TemporaryDirectory()
+        self.addCleanup(self.directory.cleanup)
+        self.root = Path(self.directory.name)
+        self.templates = self.root / 'templates'
+        self.templates.mkdir()
+        self.output = self.root / 'generated'
+        shutil.copy2(ROOT / 'generator/generator_lib.py', self.root / 'generator_lib.py')
+        (self.templates / 'header.tmpl').write_text('#define NATIVE_VALUE {{ value }}\n')
+        (self.templates / 'source.tmpl').write_text('int native_value() { return {{ value }}; }\n')
+        (self.templates / 'metadata.tmpl').write_text('{"value": {{ value }}}\n')
+        self.expected = {
+            'include/native.h': b'#define NATIVE_VALUE 7\n',
+            'src/native.cpp': b'int native_value() { return 7; }\n',
+            'metadata/native.json': b'{"value": 7}\n',
+        }
+        self.driver = self.root / 'generate.py'
+        self.driver.write_text(
+            'from generator_lib import Generator, GeneratorOutput, FileRender, run_generator\n'
+            'class NativeGenerator(Generator):\n'
+            '    def add_commandline_arguments(self, parser):\n'
+            '        parser.add_argument("--javascript")\n'
+            '    def get_outputs(self, args):\n'
+            '        renders = [\n'
+            '            FileRender("header.tmpl", "include/native.h", [{"value": 7}]),\n'
+            '            FileRender("source.tmpl", "src/native.cpp", [{"value": 7}]),\n'
+            '            FileRender("metadata.tmpl", "metadata/native.json", [{"value": 7}])\n'
+            '        ]\n'
+            '        if args.javascript:\n'
+            '            renders.append(FileRender("source.tmpl", args.javascript, [{"value": 7}]))\n'
+            '        return GeneratorOutput(renders, [])\n'
+            'raise SystemExit(run_generator(NativeGenerator()))\n')
+
+    def generate(self, *args):
+        return subprocess.run([
+            os.sys.executable, str(self.driver),
+            '--template-dir', str(self.templates),
+            '--root-dir', str(self.root), '--output-dir', str(self.output),
+            *args
+        ], cwd=self.root.parent, capture_output=True, text=True, check=False)
+
+    def assert_generated_files(self):
+        actual = {p.relative_to(self.output).as_posix(): p.read_bytes()
+                  for p in self.output.rglob('*') if p.is_file()}
+        self.assertEqual(actual, self.expected)
+
+    def test_native_generator_lists_and_writes_outputs_at_a_fixed_point(self):
+        listed = self.generate('--print-cmake-outputs')
+        self.assertEqual(listed.returncode, 0, listed.stderr)
+        self.assertEqual(set(listed.stdout.split(';')),
+                         {(self.output / path).as_posix() for path in self.expected})
+        self.assertFalse(self.output.exists())
+        for repeat in range(2):
+            with self.subTest(repeat=repeat):
+                generated = self.generate()
+                self.assertEqual(generated.returncode, 0, generated.stderr)
+                self.assert_generated_files()
+
+    def test_native_generator_preserves_input_and_output_validation(self):
+        listed = self.generate('--print-cmake-dependencies')
+        self.assertEqual(listed.returncode, 0, listed.stderr)
+        expected_dependencies = {self.driver, self.root / 'generator_lib.py',
+                                 *self.templates.iterdir()}
+        self.assertEqual(set(listed.stdout.split(';')),
+                         {p.as_posix() for p in expected_dependencies})
+        inputs = self.root / 'inputs.txt'
+        inputs.write_text('\n'.join([
+            self.driver.as_posix(), (self.root / 'generator_lib.py').as_posix(),
+            (self.templates / '*').as_posix()
+        ]) + '\n')
+        outputs = self.root / 'outputs.txt'
+        outputs.write_text('\n'.join(self.expected) + '\n')
+        arguments = ['--expected-inputs-file', str(inputs),
+                     '--expected-outputs-file', str(outputs)]
+        generated = self.generate(*arguments)
+        self.assertEqual(generated.returncode, 0, generated.stdout + generated.stderr)
+        self.assert_generated_files()
+        shutil.rmtree(self.output)
+        outputs.write_text('unexpected.h\n')
+        rejected = self.generate(*arguments)
+        self.assertEqual(rejected.returncode, 1)
+        self.assertIn('Wrong expected outputs', rejected.stdout)
+        self.assertFalse(self.output.exists())
+        outputs.write_text('\n'.join(self.expected) + '\n')
+        inputs.write_text((self.root / 'missing.py').as_posix() + '\n')
+        rejected = self.generate(*arguments)
+        self.assertEqual(rejected.returncode, 1)
+        self.assertIn('Wrong expected inputs', rejected.stdout)
+        self.assertFalse(self.output.exists())
+
+    def test_retired_generator_archive_flags_fail_before_writing(self):
+        archive = self.root / 'obsolete-output'
+        for flag in ('--output-json-tarball', '--depfile'):
+            with self.subTest(flag=flag):
+                rejected = self.generate(flag, str(archive))
+                self.assertEqual(rejected.returncode, 2)
+                self.assertIn('unrecognized arguments: ' + flag, rejected.stderr)
+                self.assertFalse(archive.exists())
+                self.assertFalse(self.output.exists())
+
+    def configure_generator(self, *args):
+        (self.root / 'CMakeLists.txt').write_text(
+            'cmake_minimum_required(VERSION 3.16)\n'
+            'project(NativeGeneratorContract NONE)\n'
+            f'set(Python3_EXECUTABLE "{Path(os.sys.executable).as_posix()}")\n'
+            f'set(Dawn_SOURCE_DIR "{self.root.as_posix()}")\n'
+            f'set(DAWN_TEMPLATE_DIR "{self.templates.as_posix()}")\n'
+            f'set(DAWN_BUILD_GEN_DIR "{self.output.as_posix()}")\n'
+            f'include("{(ROOT / "generator/CMakeLists.txt").as_posix()}")\n'
+            'if(DAWN_TEST_OUTPUT_JS)\n'
+            '  list(APPEND generator_arguments OUTPUT_JS browser_outputs)\n'
+            'endif()\n'
+            'if(DAWN_TEST_JS_OUTPUT)\n'
+            '  list(APPEND generator_arguments EXTRA_PARAMETERS --javascript "${DAWN_TEST_JS_OUTPUT}")\n'
+            'endif()\n'
+            f'DawnGenerator(SCRIPT "{self.driver.as_posix()}" PRINT_NAME NativeContract\n'
+            '  OUTPUT_HEADERS headers OUTPUT_SOURCES sources OUTPUT_JSONS jsons\n'
+            '  ${generator_arguments})\n'
+            'add_custom_target(native_codegen ALL DEPENDS ${headers} ${sources} ${jsons})\n'
+            'file(WRITE "${CMAKE_BINARY_DIR}/outputs.txt" "${headers}\n${sources}\n${jsons}\n")\n')
+        return subprocess.run([
+            CMAKE, '-S', str(self.root), '-B', str(self.root / 'build'), *args
+        ], cwd=self.root.parent, capture_output=True, text=True, check=False)
+
+    @unittest.skipUnless(CMAKE, 'CMake is required for generator build tests')
+    def test_cmake_generator_retains_native_outputs(self):
+        configured = self.configure_generator()
+        self.assertEqual(configured.returncode, 0, configured.stdout + configured.stderr)
+        self.assertEqual((self.root / 'build/outputs.txt').read_text().splitlines(),
+                         [(self.output / path).as_posix() for path in self.expected])
+        built = subprocess.run([
+            CMAKE, '--build', str(self.root / 'build'), '--target', 'native_codegen'
+        ], capture_output=True, text=True, check=False)
+        self.assertEqual(built.returncode, 0, built.stdout + built.stderr)
+        self.assert_generated_files()
+
+    @unittest.skipUnless(CMAKE, 'CMake is required for generator build tests')
+    def test_cmake_generator_rejects_retired_javascript_output(self):
+        configured = self.configure_generator('-DDAWN_TEST_OUTPUT_JS=ON')
+        self.assertNotEqual(configured.returncode, 0)
+        self.assertIn('Unparsed arguments for DawnGenerator', configured.stderr)
+        self.assertIn('OUTPUT_JS', configured.stderr)
+        self.assertFalse(self.output.exists())
+
+    @unittest.skipUnless(CMAKE, 'CMake is required for generator build tests')
+    def test_cmake_generator_rejects_javascript_as_a_native_source(self):
+        for filename in ('native.js', 'native.mjs', 'native.cjs', 'native.h.js'):
+            with self.subTest(filename=filename):
+                configured = self.configure_generator('-DDAWN_TEST_JS_OUTPUT=' + filename)
+                self.assertNotEqual(configured.returncode, 0)
+                self.assertIn('Browser JavaScript outputs were removed from this fork',
+                              configured.stderr)
+                self.assertFalse(self.output.exists())
 
 
 if __name__ == '__main__':
