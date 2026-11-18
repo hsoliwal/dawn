@@ -295,6 +295,23 @@ class RemovedBrowserTextureApiTest(unittest.TestCase):
                 self.assertNotIn('copyForBrowser', source)
 
 
+    def test_native_texture_api_survives_browser_extension_removal(self):
+        schema = json.loads((ROOT / 'src/dawn/dawn.json').read_text(encoding='utf-8'))
+        queue_methods = {entry['name'] for entry in schema['queue']['methods']}
+        encoder_methods = {entry['name'] for entry in schema['command encoder']['methods']}
+        self.assertIn('write texture', queue_methods)
+        self.assertIn('copy texture to texture', encoder_methods)
+        self.assertIn('external texture', schema)
+
+        # Removing the browser-only queue shader must not delete native texture
+        # upload, external-texture support, or the standard copy implementation.
+        sources = (ROOT / 'src/dawn/native/CMakeLists.txt').read_text(encoding='utf-8')
+        for filename in ('"Texture.cpp"', '"ExternalTexture.cpp"'):
+            self.assertIn(filename, sources)
+        queue_source = (ROOT / 'src/dawn/native/Queue.cpp').read_text(encoding='utf-8')
+        self.assertIn('QueueBase::APIWriteTexture(', queue_source)
+
+
 @unittest.skipUnless(CMAKE, 'CMake is required for configuration tests')
 class NativeConfigurationTest(unittest.TestCase):
 

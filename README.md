@@ -32,9 +32,12 @@ validation through backend execution. The fork retains Dawn Native and Tint whil
 
 The pinned submodules and build helpers use native CMake inputs without
 Chromium checkout hooks. Android JNI, native resource management, and WebGPU
-operations remain in their original owners. Compatible API names such as
-`CopyTextureForBrowser` describe native GPU operations; they do not launch or
-require a browser.
+operations remain in their original owners. The Dawn-only browser texture-copy
+extensions (`CopyTextureForBrowser` and `CopyExternalTextureForBrowser`)
+were removed in [PR #25](https://github.com/hsoliwal/dawn/pull/25).
+Native callers retain `Queue::WriteTexture`, `CommandEncoder::CopyTextureToTexture`,
+and external-texture bindings; specialized color/alpha conversion must use
+explicit native pipelines rather than the retired browser extension.
 
 ### The architecture in one minute
 
