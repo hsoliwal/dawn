@@ -23,6 +23,7 @@ jobs:
           removed_paths=(
             src/emdawnwebgpu third_party/emdawnwebgpu
             src/dawn/node src/dawn/wire include/dawn/wire
+            src/utils/chromium_test_compat
             webgpu-cts third_party/webgpu-cts scripts/dawn_node_cts
             build_overrides infra
             tools/src/cov/server.go tools/src/cov/view-coverage.html
@@ -33,6 +34,10 @@ jobs:
               exit 1
             fi
           done
+          if git grep -n -E 'chromium_test_compat|SubstituteChromiumArgs|ChromePerfReporter|use_chrome_perf_format|--use-chrome-perf-format|--test-launcher-summary-output=' -- src; then
+            echo 'Retired Chromium test/perf entry point returned' >&2
+            exit 1
+          fi
           if git ls-files | grep -E '(^|/)BUILD\.gn$|\.gni$|(^|/)\.gn$'; then
             echo 'Removed Chromium GN build files returned' >&2
             exit 1
