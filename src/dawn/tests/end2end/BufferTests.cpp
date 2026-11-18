@@ -64,11 +64,6 @@ DAWN_TEST_PARAM_STRUCT(BufferMappingTestParams, FutureCallbackMode);
 
 class BufferMappingTests : public DawnTestWithParams<BufferMappingTestParams> {
   protected:
-    void SetUp() override {
-        DawnTestWithParams<BufferMappingTestParams>::SetUp();
-        // Wire only supports polling / spontaneous futures.
-    }
-
     std::vector<wgpu::FeatureName> GetRequiredFeatures() override {
         std::vector<wgpu::FeatureName> requiredFeatures = {};
 
@@ -101,7 +96,7 @@ class BufferMappingTests : public DawnTestWithParams<BufferMappingTestParams> {
             case wgpu::CallbackMode::AllowProcessEvents:
             case wgpu::CallbackMode::AllowSpontaneous:
                 while (GetInstance().WaitAny(future, 0) == wgpu::WaitStatus::TimedOut) {
-                    // Flush wire and call instance process events.
+                    // Pump the native instance's pending operations.
                     WaitABit();
                 }
                 break;
@@ -582,8 +577,6 @@ TEST_P(BufferMappingTests, OffsetNotUpdatedOnError) {
     // and mMapOffset is not updated because the buffer is already being mapped and it doesn't
     // allow multiple MapAsync requests.
     wgpu::FutureWaitInfo f2;
-    // TODO(crbug.com/42241221): Inject a validation error from the wire client, so that behavior
-    // is consistent between native and wire.
     ASSERT_DEVICE_ERROR(
         f2 = {buffer.MapAsync(wgpu::MapMode::Read, 0, 4, GetParam().mFutureCallbackMode,
                               mMockCb.Callback())});
@@ -681,7 +674,6 @@ TEST_P(BufferMappingTests, RegressChromium1421170) {
 // Test that writing to a buffer in a compute shader, copying to a MapRead buffer,
 // waiting for OnSubmittedWorkDone, then mapping works correctly.
 TEST_P(BufferMappingTests, WaitForOnSubmittedWorkDoneThenMap) {
-    // WaitAnyOnly is not supported in wire.
     /// Fail on Xclipse with ANGLE Vulkan.
     DAWN_SUPPRESS_TEST_IF(IsSamsung() && IsOpenGLES() && IsANGLE());
 
@@ -1365,10 +1357,7 @@ TEST_P(BufferTests, BufferMappedAtCreationOOM_Simulated) {
         // Control: test a small buffer works.
         Check(false, false, &descriptor);
 
-        // Test OOM in the wire client before ever sending a command.
-
-        // Test OOM in Dawn Native. If using the wire, this could cause a
-        // non-null client buffer to point to a null server buffer.
+        // Test the native map-allocation failure path.
         oomForTesting = {};
         oomForTesting.fakeOOMAtNativeMap = true;
         Check(true, false, &descriptor);

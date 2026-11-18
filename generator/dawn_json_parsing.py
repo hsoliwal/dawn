@@ -153,7 +153,6 @@ class Type:
         self.category = json_data['category']
         self.is_nullable_pointer = json_data.get('is nullable pointer',
                                                  self.category == 'object')
-        self.is_wire_transparent = False
 
     def __lt__(self, other):
         return self.name < other.name
@@ -225,7 +224,6 @@ class EnumType(Type):
                         "Duplicate value {} for '{}' in enum '{}'".format(
                             hex(value.value), value.name.get(), name))
             all_values.add(value.value)
-        self.is_wire_transparent = True
 
     def get_child_map(self):
         return {value.name.get(): value for value in self.values}
@@ -253,7 +251,6 @@ class BitmaskType(Type):
         self.full_mask = 0
         for value in self.values:
             self.full_mask = self.full_mask | value.value
-        self.is_wire_transparent = True
 
     def get_child_map(self):
         return {value.name.get(): value for value in self.values}
@@ -286,7 +283,6 @@ class NativeType(Type):
 
     def __init__(self, is_enabled, name, json_data):
         Type.__init__(self, name, json_data, native=True)
-        self.is_wire_transparent = json_data.get('wire transparent', True)
 
 
 # Method/function argument, method/function return value, or struct member.
@@ -326,19 +322,9 @@ class RecordMember(AnnotatedTypedMember):
         if array_element_optional:
             assert annotation == 'const*', 'array_element_optional can only be used on array types'
         self.is_return_value = is_return_value
-        self.handle_type = None
-        self.id_type = None
         self.default_value = default_value
         self.skip_serialize = skip_serialize
         self.kotlin_only = kotlin_only
-
-    def set_handle_type(self, handle_type):
-        assert self.type.dict_name == "ObjectHandle"
-        self.handle_type = handle_type
-
-    def set_id_type(self, id_type):
-        assert self.type.dict_name == "ObjectId"
-        self.id_type = id_type
 
     @property
     def requires_struct_defaulting(self):
@@ -434,21 +420,6 @@ class StructureType(Record, Type):
         assert not (self.extensible and self.chained)
         self.extensions = []
 
-    def update_metadata(self):
-        Record.update_metadata(self)
-
-        if self.may_have_dawn_object:
-            self.is_wire_transparent = False
-            return
-
-        assert not (self.chained or self.extensible)
-
-        def get_is_wire_transparent(member):
-            return member.type.is_wire_transparent and member.annotation == 'value'
-
-        self.is_wire_transparent = all(
-            get_is_wire_transparent(m) for m in self.members)
-
     def get_child_map(self):
         return {member.name.get(): member for member in self.members}
 
@@ -508,8 +479,6 @@ class FunctionDeclaration():
         return {arg.name.get(): arg for arg in self.arguments}
 
 
-# TODO(crbug.com/575961728): Make this private (_linked_record_members) if its
-# usage for Dawn wire in dawn_json_generator.py can be moved/removed.
 def linked_record_members(json_data, types, check_span_regularity=False):
     members = []
     members_by_name = {}
@@ -525,12 +494,6 @@ def linked_record_members(json_data, types, check_span_regularity=False):
                               is_return_value=m.get('is_return_value', False),
                               default_value=m.get('default', None),
                               skip_serialize=m.get('skip_serialize', False))
-        handle_type = m.get('handle_type')
-        if handle_type:
-            member.set_handle_type(types[handle_type])
-        id_type = m.get('id_type')
-        if id_type:
-            member.set_id_type(types[id_type])
         members.append(member)
         members_by_name[member.name.canonical_case()] = member
         index_of_member[member.name.canonical_case()] = i

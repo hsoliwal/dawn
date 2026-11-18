@@ -2357,7 +2357,6 @@
         "chain roots": ["buffer descriptor"],
         "tags": ["dawn"],
         "members": [
-            {"name": "fake OOM at wire client map", "type": "bool"},
             {"name": "fake OOM at native map", "type": "bool"},
             {"name": "fake OOM at device", "type": "bool"}
         ]
@@ -4693,18 +4692,6 @@
         "type": "uint32_t",
         "value": "UINT32_MAX"
     },
-    "ObjectType": {
-      "_comment": "Only used for the wire",
-      "category": "native"
-    },
-    "ObjectId": {
-      "_comment": "Only used for the wire",
-      "category": "native"
-    },
-    "ObjectHandle": {
-      "_comment": "Only used for the wire",
-      "category": "native"
-    },
     "void": {
         "category": "native"
     },
@@ -4723,8 +4710,7 @@
         "category": "native"
     },
     "size_t": {
-        "category": "native",
-        "wire transparent": false
+        "category": "native"
     },
     "uint16_t": {
         "category": "native"
