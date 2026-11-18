@@ -49,7 +49,7 @@ endif()
 function(DawnGenerator)
     cmake_parse_arguments(PARSE_ARGV 0 arg
         ""
-        "SCRIPT;OUTPUT_HEADERS;OUTPUT_SOURCES;OUTPUT_JSONS;OUTPUT_JS;PRINT_NAME"
+        "SCRIPT;OUTPUT_HEADERS;OUTPUT_SOURCES;OUTPUT_JSONS;PRINT_NAME"
         "EXTRA_PARAMETERS"
     )
     message(STATUS "Dawn: Configuring DawnGenerator for ${arg_PRINT_NAME}.")
@@ -114,15 +114,14 @@ function(DawnGenerator)
     set(headers)
     set(sources)
     set(jsons)
-    set(js)
     foreach (filename IN LISTS OUTPUTS)
         get_filename_component(extension "${filename}" EXT)
-        if (extension MATCHES "(h|hpp)")
+        if (extension MATCHES "\\.(js|mjs|cjs)$")
+            message(FATAL_ERROR "Browser JavaScript outputs were removed from this fork: ${filename}")
+        elseif (extension MATCHES "(h|hpp)")
             list(APPEND headers "${filename}")
         elseif (extension MATCHES "(json)")
             list(APPEND jsons "${filename}")
-        elseif (extension MATCHES "(js)")
-            list(APPEND js "${filename}")
         else ()
             list(APPEND sources "${filename}")
         endif ()
@@ -146,16 +145,9 @@ function(DawnGenerator)
             "Please provide a variable name for OUTPUT_JSONS.")
     endif ()
 
-    if (js AND NOT arg_OUTPUT_JS)
-        message(FATAL_ERROR
-            "This function generated JS files, although an output variable was not defined!"
-            "Please provide a variable name for OUTPUT_JS.")
-    endif ()
-
     set(${arg_OUTPUT_SOURCES} ${sources} PARENT_SCOPE)
     set(${arg_OUTPUT_HEADERS} ${headers} PARENT_SCOPE)
     set(${arg_OUTPUT_JSONS} ${jsons} PARENT_SCOPE)
-    set(${arg_OUTPUT_JS} ${js} PARENT_SCOPE)
 endfunction()
 
 # Helper function to call dawn_generator.py:
@@ -165,7 +157,7 @@ endfunction()
 function(DawnJSONGenerator)
     cmake_parse_arguments(PARSE_ARGV 0 arg
         ""
-        "TARGET;OUTPUT_SOURCES;OUTPUT_HEADERS;OUTPUT_JSONS;OUTPUT_JS;PRINT_NAME"
+        "TARGET;OUTPUT_SOURCES;OUTPUT_HEADERS;OUTPUT_JSONS;PRINT_NAME"
         "ADDIN_JSONS"
     )
     set(addin_args)
@@ -178,7 +170,6 @@ function(DawnJSONGenerator)
         OUTPUT_HEADERS HEADERS
         OUTPUT_SOURCES SOURCES
         OUTPUT_JSONS JSONS
-        OUTPUT_JS JS
         EXTRA_PARAMETERS
              --dawn-json
              "${Dawn_SOURCE_DIR}/src/dawn/dawn.json"
@@ -221,18 +212,8 @@ function(DawnJSONGenerator)
             "This function did not generate JSON files. The OUTPUT_JSONS argument is unnecessary.")
     endif ()
 
-    if (JS AND NOT arg_OUTPUT_JS)
-        message(FATAL_ERROR
-            "This function generated JS files, although an output variable was not defined! "
-            "Please provide a variable name for OUTPUT_JS.")
-    elseif (arg_OUTPUT_JS AND NOT JS)
-        message(WARNING
-            "This function did not generate JS files. The OUTPUT_JS argument is unnecessary.")
-    endif ()
-
     # Forward the result up one more scope
     set(${arg_OUTPUT_SOURCES} ${SOURCES} PARENT_SCOPE)
     set(${arg_OUTPUT_HEADERS} ${HEADERS} PARENT_SCOPE)
     set(${arg_OUTPUT_JSONS} ${JSONS} PARENT_SCOPE)
-    set(${arg_OUTPUT_JS} ${JS} PARENT_SCOPE)
 endfunction()

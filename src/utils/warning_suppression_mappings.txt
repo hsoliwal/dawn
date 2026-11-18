@@ -29,16 +29,12 @@ src:*src{/,\\}dawn{/,\\}native{/,\\}opengl{/,\\}*
 src:*src{/,\\}dawn{/,\\}tests{/,\\}*
 # Google Mock's gmock-actions.h contains sign conversion warnings.
 src:*third_party{/,\\}googletest{/,\\}googlemock{/,\\}*
-# V8's v8-internal.h adds signed int offsets to unsigned Address values.
-src:*third_party{/,\\}v8{/,\\}src{/,\\}include{/,\\}*
+
 
 [zero-as-null-pointer-constant]
 # Used by EGL macros.
 src:*src{/,\\}dawn{/,\\}native{/,\\}opengl{/,\\}*EGL*
-# Node Addon API headers contain zero as null pointer constant warnings.
-src:*third_party{/,\\}node-addon-api{/,\\}*
-# Use 0 as nullptr.
-src:*third_party{/,\\}partition_alloc{/,\\}src{/,\\}*
+
 
 [cast-function-type-strict]
 # Needed to cast procs in GL.
@@ -55,8 +51,6 @@ src:*src{/,\\}dawn{/,\\}tests{/,\\}end2end{/,\\}EventTests.cpp
 src:*src{/,\\}dawn{/,\\}tests{/,\\}white_box{/,\\}GLGraphicsResetTests.cpp
 src:*src{/,\\}dawn{/,\\}tests{/,\\}unittests{/,\\}GetProcAddressTests.cpp
 src:*src{/,\\}dawn{/,\\}tests{/,\\}unittests{/,\\}validation{/,\\}StableInstanceValidationTests.cpp
-# For some unknown reason this one filepath can get a backslash on Windows.
-src:*gen{/,\\}src{/,\\}dawn{/,\\}wire{/,\\}client{/,\\}ApiProcs_autogen.cpp.inc
 # Needed to cast procs in Windows.
 src:*src{/,\\}tint{/,\\}utils{/,\\}command{/,\\}command_windows.cc
 src:*src{/,\\}tint{/,\\}lang{/,\\}hlsl{/,\\}validate{/,\\}validate.cc
@@ -71,8 +65,6 @@ src:*src{/,\\}dawn{/,\\}native{/,\\}vulkan{/,\\}UtilsVulkan.cpp
 src:*src{/,\\}dawn{/,\\}native{/,\\}vulkan{/,\\}VulkanExtensions.cpp
 src:*src{/,\\}dawn{/,\\}native{/,\\}vulkan{/,\\}VulkanFunctions.cpp
 src:*src{/,\\}dawn{/,\\}native{/,\\}vulkan{/,\\}VulkanInfo.cpp
-# For C-Style casts in partition_alloc/
-src:*third_party{/,\\}partition_alloc{/,\\}src{/,\\}*
 # For D3D12_ENCODE_ANISOTROPIC_FILTER
 src:*src{/,\\}dawn{/,\\}native{/,\\}d3d12{/,\\}SamplerD3D12.cpp
 
@@ -90,36 +82,10 @@ src:*third_party{/,\\}abseil-cpp{/,\\}absl{/,\\}strings{/,\\}str_cat.h
 src:*third_party{/,\\}google_benchmark{/,\\}*
 
 [undef]
-# __OBJC__ and DEFINE_PARTITION_ROOT_EXPORT_TEMPLATE can be undefined.
-src:*third_party{/,\\}partition_alloc{/,\\}src{/,\\}partition_alloc{/,\\}pointers{/,\\}raw_ptr.h
-src:*third_party{/,\\}partition_alloc{/,\\}src{/,\\}partition_alloc{/,\\}internal{/,\\}partition_root_exports.h
-# __PTRAUTH__ can be undefined in build_config.h
-src:*build{/,\\}build_config.h
-# V8 headers test V8_TARGET_ARCH_* and USING_V8_SHARED macros with #if.
-src:*third_party{/,\\}v8{/,\\}src{/,\\}include{/,\\}*
 # minizip's ioapi.h tests __ANDROID_API__ on platforms that do not define it.
 src:*third_party{/,\\}zlib{/,\\}contrib{/,\\}minizip{/,\\}ioapi.h
 # GoogleTest's gtest-port.h tests GTEST_HAS_DEATH_TEST with #if on platforms that do not define it (e.g. iOS).
 src:*third_party{/,\\}googletest{/,\\}{,src/,src\\}googletest{/,\\}include{/,\\}gtest{/,\\}internal{/,\\}gtest-port.h
-
-[unique-object-duplication]
-# straighten_larger_slot_span_free_lists_, sort_smaller_slot_span_free_lists_,
-# and sort_active_slot_spans_ may be duplicated when built into a shared library.
-src:*third_party{/,\\}partition_alloc{/,\\}src{/,\\}partition_alloc{/,\\}partition_root.h
-# V8's v8-internal.h and v8-platform.h define static objects in inline functions and templates.
-src:*third_party{/,\\}v8{/,\\}src{/,\\}include{/,\\}*
-
-[non-virtual-dtor]
-# V8 headers define interface and mixin classes without virtual destructors.
-src:*third_party{/,\\}v8{/,\\}src{/,\\}include{/,\\}*
-
-[suggest-destructor-override]
-# V8's v8-microtask-queue.h declares ~MicrotaskQueue() without override.
-src:*third_party{/,\\}v8{/,\\}src{/,\\}include{/,\\}*
-
-[undefined-reinterpret-cast]
-# V8's v8-function-callback.h reinterpret_casts internal::Address* to Isolate**.
-src:*third_party{/,\\}v8{/,\\}src{/,\\}include{/,\\}*
 
 [nullability-extension]
 # absl uses _Nonnull.

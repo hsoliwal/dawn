@@ -25,30 +25,17 @@
 # CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
 # OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-"""Module to create generators that render multiple Jinja2 templates for GN.
+"""Render Jinja2 templates directly into a native build's output directory.
 
-A helper module that can be used to create generator scripts (clients)
-that expand one or more Jinja2 templates, without outputs usable from
-GN and Ninja build-based systems. See generator_lib.gni as well.
+Clients create a Generator subclass and pass an instance to run_generator().
+Each FileRender names a template, an output path and its rendering parameters.
+CMake can query dependencies and outputs before scheduling direct generation.
 
-Clients should create a Generator sub-class, then call run_generator()
-with a proper derived class instance.
-
-Clients specify a list of FileRender operations, each one of them will
-output a file into a temporary output directory through Jinja2 expansion.
-All temporary output files are then grouped and written to into a single JSON
-file, that acts as a convenient single GN output target. Use extract_json.py
-to extract the output files from the JSON tarball in another GN action.
-
---depfile can be used to specify an output Ninja dependency file for the
-JSON tarball, to ensure it is regenerated any time one of its dependencies
-changes.
-
-Finally, --expected-output-files can be used to check the list of generated
-output files.
+--expected-inputs-file and --expected-outputs-file validate the declared input
+and output sets before any generated files are written.
 """
 
-import argparse, fnmatch, json, os, re, sys
+import argparse, fnmatch, os, re, sys
 from collections import namedtuple
 
 # A FileRender represents a single Jinja2 template render operation:
@@ -282,17 +269,6 @@ def run_generator(generator, args=None):
                         type=str,
                         help='Directory with template files.')
     parser.add_argument(
-        '--output-json-tarball',
-        default=None,
-        type=str,
-        help=('Name of the "JSON tarball" to create (tar is too annoying '
-              'to use in python).'))
-    parser.add_argument(
-        '--depfile',
-        default=None,
-        type=str,
-        help='Name of the Ninja depfile to create for the JSON tarball')
-    parser.add_argument(
         '--expected-outputs-file',
         default=None,
         type=str,
@@ -334,7 +310,7 @@ def run_generator(generator, args=None):
 
     output = generator.get_outputs(args)
 
-    # Output a list of all dependencies for CMake or the tarball for GN/Ninja.
+    # Compute dependencies for CMake and input validation.
     dependencies = generator.get_dependencies(args)
     dependencies += [
         args.template_dir + os.path.sep + render.template
@@ -345,14 +321,6 @@ def run_generator(generator, args=None):
         for template in output.imported_templates
     ]
     dependencies += _compute_python_dependencies(args.root_dir)
-
-    if args.depfile != None:
-        # Siso/Ninja requires relative paths in depfile for relocatability.
-        # Convert all dependencies to be relative to the current working directory (build dir).
-        relative_dependencies = [os.path.relpath(dep) for dep in dependencies]
-        with open(args.depfile, 'w') as f:
-            f.write(args.output_json_tarball + ": " +
-                    " ".join(relative_dependencies))
 
     # The caller wants to assert that the inputs are what it expects.
     # Load the file and compare with our dependencies.
@@ -373,7 +341,7 @@ def run_generator(generator, args=None):
 
         absolute_actual = set([os.path.abspath(dep) for dep in dependencies])
 
-        # Added (Missing from GN): Actual dependencies that are NOT in expected literals
+        # Added: Actual dependencies that are NOT in expected literals
         # AND do NOT match any of the expected glob patterns.
         added = set()
         for dep in absolute_actual:
@@ -389,7 +357,7 @@ def run_generator(generator, args=None):
             if not matched:
                 added.add(dep)
 
-        # Removed (Unexpected in GN): Expected literals that are NOT in actual dependencies.
+        # Removed: Expected literals that are NOT in actual dependencies.
         removed = absolute_expected_literals - absolute_actual
 
         if added or removed:
@@ -402,13 +370,11 @@ def run_generator(generator, args=None):
             for p in sorted(list(absolute_actual)):
                 print("    " + p)
             if added:
-                print("Missing from expected inputs (need to be added to GN):")
+                print("Missing from expected inputs:")
                 for p in sorted(list(added)):
                     print("    " + p)
             if removed:
-                print(
-                    "Unexpected in expected inputs (need to be removed from GN):"
-                )
+                print("Unexpected in expected inputs:")
                 for p in sorted(list(removed)):
                     print("    " + p)
             return 1
@@ -441,15 +407,6 @@ def run_generator(generator, args=None):
         return 0
 
     render_outputs = _do_renders(output, args.template_dir)
-
-    # Output the JSON tarball
-    if args.output_json_tarball != None:
-        json_root = {}
-        for output in render_outputs:
-            json_root[output.name] = output.content
-
-        with open(args.output_json_tarball, 'w') as f:
-            f.write(json.dumps(json_root))
 
     # Output the files directly.
     if args.output_dir != None:

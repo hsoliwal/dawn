@@ -25,11 +25,14 @@
 # OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-# Keep browser configurations from appearing to succeed after their targets have
-# been removed. In particular, CMake otherwise only warns about a cached legacy
-# DAWN_BUILD_NODE_BINDINGS option and generates a different product.
+# Keep removed browser targets and compiler tooling from appearing to succeed.
+# CMake otherwise only warns about cached legacy options and generates a
+# different product.
 if (EMSCRIPTEN OR CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
   message(FATAL_ERROR "Browser builds (Emscripten, emdawnwebgpu) were removed from this fork; build Dawn natively.")
+endif()
+if (TINT_CHECK_CHROMIUM_STYLE)
+  message(FATAL_ERROR "TINT_CHECK_CHROMIUM_STYLE was removed from this fork; use a native compiler without Chromium plugins.")
 endif()
 if (DAWN_BUILD_NODE_BINDINGS)
   message(FATAL_ERROR "DAWN_BUILD_NODE_BINDINGS was removed from this fork; use the native WebGPU C/C++ or JNI bindings.")
