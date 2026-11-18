@@ -312,6 +312,33 @@ class RemovedBrowserTextureApiTest(unittest.TestCase):
         self.assertIn('QueueBase::APIWriteTexture(', queue_source)
 
 
+class RemovedWireSchemaTest(unittest.TestCase):
+    """Prevent retired wire/client and Android WebView source metadata from returning."""
+
+    def test_wire_only_schema_entries_removed_without_native_api_loss(self):
+        schema = json.loads((ROOT / 'src/dawn/dawn.json').read_text(encoding='utf-8'))
+        for obsolete in ('ObjectType', 'ObjectId', 'ObjectHandle'):
+            with self.subTest(obsolete=obsolete):
+                self.assertNotIn(obsolete, schema)
+        self.assertNotIn('wire transparent', schema['size_t'])
+        fake_oom = schema['dawn fake buffer OOM for testing']
+        self.assertEqual([m['name'] for m in fake_oom['members']],
+                         ['fake OOM at native map', 'fake OOM at device'])
+        self.assertIn('write texture', [m['name'] for m in schema['queue']['methods']])
+        self.assertIn('external texture', schema)
+
+    def test_retired_wire_parser_and_webview_toggle_are_absent(self):
+        parser = (ROOT / 'generator/dawn_json_parsing.py').read_text(encoding='utf-8')
+        for obsolete in ('is_wire_transparent', 'set_handle_type', 'set_id_type',
+                         'wire transparent'):
+            with self.subTest(obsolete=obsolete):
+                self.assertNotIn(obsolete, parser)
+        for relative in ('src/dawn/native/Toggles.h', 'src/dawn/native/Toggles.cpp'):
+            source = (ROOT / relative).read_text(encoding='utf-8')
+            self.assertNotIn('WebViewInstance', source)
+            self.assertNotIn('webview_instance', source)
+
+
 @unittest.skipUnless(CMAKE, 'CMake is required for configuration tests')
 class NativeConfigurationTest(unittest.TestCase):
 

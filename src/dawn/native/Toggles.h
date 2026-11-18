@@ -69,7 +69,6 @@ enum class Toggle {
     MetalEnableVertexPulling,
     AllowUnsafeAPIs,
     AllowExperimentalAPIs,
-    WebViewInstance,
     FlushBeforeClientWaitSync,
     UseTempBufferInSmallFormatTextureToTextureCopyFromGreaterToLessMipLevel,
     EmitHLSLDebugSymbols,
