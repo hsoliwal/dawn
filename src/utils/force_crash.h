@@ -53,7 +53,7 @@
 #elif DAWN_PLATFORM_IS(PPC) || DAWN_PLATFORM_IS(PPC64)
 #define DAWN_DETAIL_TRAP() asm volatile("twge 2,2");
 #elif DAWN_PLATFORM_IS(WASM32) || DAWN_PLATFORM_IS(WASM64)
-#define DAWN_DETAIL_TRAP() EM_ASM(debugger;);
+#define DAWN_DETAIL_TRAP() __builtin_trap();
 #else
 #error "Unsupported platform"
 #endif

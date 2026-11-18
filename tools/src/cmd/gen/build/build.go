@@ -37,12 +37,9 @@ import (
 	"flag"
 	"fmt"
 	"log"
-	"os/exec"
 	"path"
 	"path/filepath"
 	"regexp"
-	"runtime"
-	"sort"
 	"strings"
 
 	"dawn.googlesource.com/dawn/tools/src/cmd/gen/common"
@@ -709,17 +706,16 @@ var platformOSMap = map[string]string{
 // labels. Supported dependencies map to non-empty strings, while unsupported dependencies map
 // to empty strings.
 var externalDependencyBazelTargets = map[string]string{
-	"abseil":                         `"@abseil_cpp//absl/strings",`,
-	"dxc-include":                    `"//third_party/directx-shader-compiler:dxc_headers",`,
-	"gmock":                          `"@gtest",`,
-	"google-benchmark":               `"@benchmark",`,
-	"gtest":                          `"@gtest",`,
-	"spirv-headers":                  `"@spirv_headers//:spirv_cpp11_headers", "@spirv_headers//:spirv_c_headers",`,
-	"spirv-opt-internal":             `"@spirv_tools//:spirv_tools_opt",`,
-	"spirv-tools":                    `"@spirv_tools",`,
-	"src_utils_crash_handler":        `"//src/utils:crash_handler",`,
-	"src_utils":                      `"//src/utils",`,
-	"src_utils_chromium_test_compat": `"//src/utils/chromium_test_compat",`,
+	"abseil":                  `"@abseil_cpp//absl/strings",`,
+	"dxc-include":             `"//third_party/directx-shader-compiler:dxc_headers",`,
+	"gmock":                   `"@gtest",`,
+	"google-benchmark":        `"@benchmark",`,
+	"gtest":                   `"@gtest",`,
+	"spirv-headers":           `"@spirv_headers//:spirv_cpp11_headers", "@spirv_headers//:spirv_c_headers",`,
+	"spirv-opt-internal":      `"@spirv_tools//:spirv_tools_opt",`,
+	"spirv-tools":             `"@spirv_tools",`,
+	"src_utils_crash_handler": `"//src/utils:crash_handler",`,
+	"src_utils":               `"//src/utils",`,
 	// Explicitly mark unsupported dependencies as empty so they can be identified as unsupported
 	// and we can omit a block if it only contains unsupported deps.
 	"dl":                    "",
@@ -887,36 +883,6 @@ func emitBuildFiles(p *Project, fsReaderWriter oswrapper.FilesystemReaderWriter)
 				return nil, err
 			}
 
-			// Format the output if it's a GN file.
-			if path.Ext(outputName) == ".gn" {
-				unformatted := w.String()
-
-				platform := ""
-				cmd := "gn"
-				switch runtime.GOOS {
-				case "linux":
-					platform = "linux64"
-				case "windows":
-					platform = "win"
-					cmd += ".exe"
-				case "darwin":
-					platform = "mac"
-				default:
-					return nil, fmt.Errorf("unknown platform %v\n", runtime.GOOS)
-				}
-
-				gn_path := filepath.Join("buildtools", platform, cmd)
-
-				gn := exec.Command(gn_path, "format", "--stdin")
-				gn.Stdin = bytes.NewReader([]byte(unformatted))
-				w.Reset()
-				gn.Stdout = w
-				gn.Stderr = w
-				if err := gn.Run(); err != nil {
-					return nil, fmt.Errorf("%v\ngn format failed: %w\n%v", unformatted, err, w.String())
-				}
-			}
-
 			if string(existing) != w.String() {
 				if !p.cfg.Flags.CheckStale {
 					if err := fsReaderWriter.WriteFile(outputPath, w.Bytes(), 0666); err != nil {
@@ -965,15 +931,7 @@ func emitBuildFiles(p *Project, fsReaderWriter oswrapper.FilesystemReaderWriter)
 	}
 	depsForGeneratedSources = append(depsForGeneratedSources, p.AllTemplatePaths.List()...)
 
-	goSources, err := getGoDependencies(p, fsReaderWriter)
-	if err != nil {
-		return err
-	}
-
 	if err := emitGeneratedSourceListForBazel(p, fsReaderWriter, generatedSources, depsForGeneratedSources); err != nil {
-		return err
-	}
-	if err := emitGeneratedSourceListForGN(p, fsReaderWriter, generatedSources, depsForGeneratedSources, goSources); err != nil {
 		return err
 	}
 
@@ -1040,20 +998,6 @@ func emitGeneratedSourceListForBazel(p *Project, fsReaderWriter oswrapper.Filesy
 	return writeFileIfStale(p, fsReaderWriter, bzlPath, sb.String())
 }
 
-func emitGeneratedSourceListForGN(p *Project, fsReaderWriter oswrapper.FilesystemReaderWriter, generatedSources []string, depsForGeneratedSources []string, goSources []string) error {
-	gniPath := path.Join(p.Root, "generated_sources.gni")
-	sb := &strings.Builder{}
-	sb.WriteString(common.Header("", "", "#"))
-	sb.WriteString("\n")
-	sb.WriteString("import(\"tint.gni\")\n\n")
-
-	deps := append(depsForGeneratedSources, goSources...)
-	emitList(sb, generatedSources, "tint_generated_sources = [\n", "]\n\n", "  \"${root_gen_dir}/", "\",\n")
-	emitList(sb, deps, "tint_generation_dependencies = [\n", "]\n", "  \"", "\",\n")
-
-	return writeFileIfStale(p, fsReaderWriter, gniPath, sb.String())
-}
-
 func writeFileIfStale(p *Project, fsReaderWriter oswrapper.FilesystemReaderWriter, filepath string, content string) error {
 	existing, _ := fsReaderWriter.ReadFile(filepath)
 	if string(existing) != content {
@@ -1093,30 +1037,6 @@ var (
 	reCondition     = regexp.MustCompile(`//\s*GEN_BUILD:CONDITION\((.*)\)\s*$`)
 	reDoNotGenerate = regexp.MustCompile(`#\s*GEN_BUILD:DO_NOT_GENERATE`)
 )
-
-func getGoDependencies(p *Project, fsReaderWriter oswrapper.FilesystemReaderWriter) ([]string, error) {
-	dawnRoot := path.Dir(path.Dir(p.Root))
-	files, err := glob.Scan(dawnRoot, glob.MustParseConfig(`{
-		"paths": [
-			{"include": ["tools/src/cmd/gen/**/*.go", "tools/src/tint/intrinsic/**/*.go"]},
-			{"exclude": ["tools/src/cmd/gen/build/**", "**/*_test.go"]}
-		]
-	}`), fsReaderWriter)
-	if err != nil {
-		return nil, err
-	}
-
-	var goFiles []string
-	for _, f := range files {
-		relToTint, err := filepath.Rel("src/tint", f)
-		if err != nil {
-			return nil, err
-		}
-		goFiles = append(goFiles, filepath.ToSlash(relToTint))
-	}
-	sort.Strings(goFiles)
-	return goFiles, nil
-}
 
 // HasObjcSrcs returns true if the target contains any Objective-C++ .mm files.
 func (t *Target) HasObjcSrcs() bool {

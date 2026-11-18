@@ -31,13 +31,8 @@ ROOT_DIR="$( cd "${SCRIPT_DIR}/.." >/dev/null 2>&1 && pwd )"
 
 set -e  # fail on error
 
-if ! command -v clang_format.py &> /dev/null; then
-    echo "clang_format.py not found on PATH"
-    exit 1
-fi
-
-if ! command -v gn &> /dev/null; then
-    echo "gn not found on PATH"
+if ! command -v clang-format &> /dev/null; then
+    echo "clang-format not found on PATH"
     exit 1
 fi
 
@@ -49,19 +44,11 @@ CLANG_FORMAT_FILES+="`find src -name "*.m"` "
 CLANG_FORMAT_FILES+="`find src -name "*.mm"` "
 CLANG_FORMAT_FILES+="`find include -name "*.h"` "
 
-GN_FILES="BUILD.gn "
-GN_FILES+="`find src -name "*.gn"` "
-
 if command -v go &> /dev/null; then
     # Go is installed. Run in parallel for speed wins
     ${SCRIPT_DIR}/run run-parallel  \
-         clang_format.py -i         \
+         clang-format -i            \
          $ -- $CLANG_FORMAT_FILES
-
-    ${SCRIPT_DIR}/run run-parallel  \
-         gn format                  \
-         $ -- $GN_FILES
 else
-    clang_format.py -i $CLANG_FORMAT_FILES
-    gn format $GN_FILES
+    clang-format -i $CLANG_FORMAT_FILES
 fi

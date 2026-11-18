@@ -28,16 +28,66 @@
 package build
 
 import (
+	"context"
 	"fmt"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"dawn.googlesource.com/dawn/tools/src/cmd/gen/common"
 
 	"dawn.googlesource.com/dawn/tools/src/cnf"
 	"dawn.googlesource.com/dawn/tools/src/container"
+	"dawn.googlesource.com/dawn/tools/src/fileutils"
 	"dawn.googlesource.com/dawn/tools/src/oswrapper"
 	"github.com/stretchr/testify/require"
 )
+
+func TestBuildGenerationPreservesNativeOutputsWithoutGN(t *testing.T) {
+	fs, err := fileutils.CreateFSTestOSWrapperWithFakeDawnRoot()
+	require.NoError(t, err)
+	root := fileutils.DawnRoot(fs)
+	require.NotEmpty(t, root)
+	write := func(name string, contents []byte) {
+		t.Helper()
+		require.NoError(t, fs.MkdirAll(filepath.Dir(name), 0755))
+		require.NoError(t, fs.WriteFile(name, contents, 0644))
+	}
+	for _, name := range []string{"BUILD.cmake.tmpl", "BUILD.bazel.tmpl"} {
+		path := filepath.Join(fileutils.ThisDir(), name)
+		contents, err := oswrapper.GetRealOSWrapper().ReadFile(path)
+		require.NoError(t, err)
+		write(path, contents)
+	}
+	write(filepath.Join(root, srcTint, "externals.json"), []byte("{}"))
+	write(filepath.Join(root, srcTint, "sample", "source.h"), nil)
+	write(filepath.Join(root, srcTint, "sample", "source.cc"),
+		[]byte("#include \"src/tint/sample/source.h\"\n"))
+	write(filepath.Join(root, srcTint, "sample", "generated.h.tmpl"), nil)
+
+	cfg := &common.Config{OsWrapper: fs}
+	require.NoError(t, (Cmd{}).Run(context.Background(), cfg))
+	read := func(name string) string {
+		t.Helper()
+		contents, err := fs.ReadFile(filepath.Join(root, srcTint, name))
+		require.NoError(t, err)
+		return string(contents)
+	}
+	require.Contains(t, read("BUILD.cmake"), "include(sample/BUILD.cmake)")
+	require.Contains(t, read("sample/BUILD.cmake"), "tint_add_target(tint_sample lib")
+	require.Contains(t, read("sample/BUILD.cmake"), "sample/source.cc")
+	require.Contains(t, read("sample/BUILD.bazel"), "cc_library(")
+	require.Contains(t, read("sample/BUILD.bazel"), "\"source.cc\"")
+	require.Contains(t, read("generated_sources.bzl"), "gen/src/tint/sample/generated.h")
+	for _, name := range []string{"BUILD.gn", "sample/BUILD.gn", "generated_sources.gni"} {
+		_, err := fs.Stat(filepath.Join(root, srcTint, name))
+		require.ErrorIs(t, err, os.ErrNotExist, "native generation must not recreate %s", name)
+	}
+
+	// The retained formats reach a fixed point without any GN tools or outputs.
+	cfg.Flags.CheckStale = true
+	require.NoError(t, (Cmd{}).Run(context.Background(), cfg))
+}
 
 func TestLoadExternals(t *testing.T) {
 	tests := []struct {

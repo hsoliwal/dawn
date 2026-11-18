@@ -339,5 +339,98 @@ class NativeSetupBuildTest(unittest.TestCase):
         self.assertFalse(self.arguments.exists())
 
 
+@unittest.skipUnless(shutil.which('bash') and shutil.which('find') and shutil.which('dirname'),
+                     'Bash and file discovery tools are required for native tooling')
+class NativeToolsTest(unittest.TestCase):
+
+    def setUp(self):
+        self.directory = tempfile.TemporaryDirectory()
+        self.addCleanup(self.directory.cleanup)
+        self.root = Path(self.directory.name)
+        (self.root / 'tools/src/cmd/gen').mkdir(parents=True)
+        (self.root / 'tools/src/cmd/run-parallel').mkdir()
+        (self.root / 'bin').mkdir()
+        for tool in ('format', 'run', 'run.py'):
+            shutil.copy2(ROOT / 'tools' / tool, self.root / 'tools' / tool)
+        for command in ('bash', 'find', 'dirname'):
+            (self.root / 'bin' / command).symlink_to(shutil.which(command))
+        (self.root / 'bin/python3').symlink_to(os.sys.executable)
+        self.arguments = self.root / 'arguments.json'
+        self.env = dict(os.environ, PATH=str(self.root / 'bin'),
+                        DAWN_TEST_TOOL_ARGUMENTS=str(self.arguments))
+
+    def install_tool(self, name):
+        tool = self.root / 'bin' / name
+        tool.write_text(
+            '#!' + os.sys.executable + '\n'
+            'import json, os, sys\n'
+            'from pathlib import Path\n'
+            'Path(os.environ["DAWN_TEST_TOOL_ARGUMENTS"]).write_text(json.dumps({'
+            '"args": sys.argv[1:], "cwd": os.getcwd(), '
+            '"cgo": os.environ.get("CGO_ENABLED"), '
+            '"modules": os.environ.get("GO111MODULE")}))\n'
+            'sys.exit(int(os.environ.get("DAWN_TEST_TOOL_EXIT", "0")))\n')
+        tool.chmod(0o755)
+
+    def test_format_uses_native_tools_without_gn_or_depot_tools(self):
+        sources = ['src/sample.h', 'src/sample.cc', 'src/sample.cpp',
+                   'src/sample.m', 'src/sample.mm', 'include/public.h']
+        for source in sources:
+            path = self.root / source
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text('// native formatter input\n')
+        self.install_tool('clang-format')
+        for parallel in (False, True):
+            with self.subTest(parallel=parallel):
+                if parallel:
+                    self.install_tool('go')
+                # Neither branch has GN or a depot_tools formatter wrapper.
+                result = subprocess.run([
+                    shutil.which('bash'), str(self.root / 'tools/format')
+                ], cwd=self.root, env=self.env, capture_output=True,
+                   text=True, check=False)
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                actual = json.loads(self.arguments.read_text())
+                if parallel:
+                    prefix = ['run', './tools/src/cmd/run-parallel',
+                              'clang-format', '-i', '$', '--']
+                    self.assertEqual(actual['args'][:len(prefix)], prefix)
+                    self.assertCountEqual(actual['args'][len(prefix):], sources)
+                    self.assertEqual(actual['cgo'], '0')
+                    self.assertEqual(actual['modules'], 'on')
+                else:
+                    self.assertEqual(actual['args'][0], '-i')
+                    self.assertCountEqual(actual['args'][1:], sources)
+                self.assertEqual(actual['cwd'], str(self.root))
+
+    def test_launcher_preserves_native_go_arguments_environment_and_failure(self):
+        self.install_tool('go')
+        self.env['DAWN_TEST_TOOL_EXIT'] = '7'
+        for relative_path in (False, True):
+            with self.subTest(relative_path=relative_path):
+                self.arguments.unlink(missing_ok=True)
+                self.env['PATH'] = (os.path.relpath(self.root / 'bin', self.root.parent)
+                                    if relative_path else str(self.root / 'bin'))
+                result = subprocess.run([
+                    os.sys.executable, str(self.root / 'tools/run.py'),
+                    'gen', 'build', '-check-stale'
+                ], cwd=self.root.parent, env=self.env, capture_output=True,
+                   text=True, check=False)
+                self.assertEqual(result.returncode, 7, result.stdout + result.stderr)
+                actual = json.loads(self.arguments.read_text())
+                self.assertEqual(actual, {
+                    'args': ['run', './tools/src/cmd/gen', 'build', '-check-stale'],
+                    'cwd': str(self.root), 'cgo': '0', 'modules': 'on'
+                })
+
+    def test_launcher_reports_missing_go_before_starting_a_tool(self):
+        result = subprocess.run([
+            os.sys.executable, str(self.root / 'tools/run.py'), 'gen', 'build'
+        ], env=self.env, capture_output=True, text=True, check=False)
+        self.assertEqual(result.returncode, 1)
+        self.assertIn('Go is not installed or not in PATH', result.stderr)
+        self.assertFalse(self.arguments.exists())
+
+
 if __name__ == '__main__':
     unittest.main()
