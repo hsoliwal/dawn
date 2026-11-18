@@ -26,11 +26,9 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include "gtest/gtest.h"
-#include "src/utils/chromium_test_compat/chromium_test_compat.h"
 #include "unittests/validation/ValidationTest.h"
 
 int main(int argc, char** argv) {
-    dawn::SubstituteChromiumArgs(argc, argv);
     dawn::InitDawnValidationTestEnvironment(argc, argv);
     testing::InitGoogleTest(&argc, argv);
     return RUN_ALL_TESTS();
