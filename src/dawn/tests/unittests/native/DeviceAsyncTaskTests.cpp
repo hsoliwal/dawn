@@ -58,6 +58,17 @@ TEST_F(DeviceAsyncTaskTests, LongAsyncTaskFinishesBeforeDeviceIsDropped) {
     EXPECT_TRUE(done.load());
 }
 
+// Move-only captures must be transferable into an async task without copying the closure.
+TEST_F(DeviceAsyncTaskTests, MoveOnlyPayloadCompletesBeforeDeviceIsDropped) {
+    std::atomic_int observed(0);
+    auto payload = std::make_unique<int>(42);
+    mDeviceMock->GetAsyncTaskManager()->PostTask<AsyncTask>(
+        [value = std::move(payload), &observed]() { observed.store(*value); });
+    EXPECT_FALSE(payload);
+    DropDevice();
+    EXPECT_EQ(observed.load(), 42);
+}
+
 // Test that error scope resolution is blocked on AsyncTask completion.
 TEST_F(DeviceAsyncTaskTests, ErrorScopeBlockedOnAsyncTask) {
     device.PushErrorScope(wgpu::ErrorFilter::Validation);
