@@ -110,10 +110,5 @@
         "IncludePatterns": [
             "src/utils/*"
         ]
-    },
-    "src_utils_chromium_test_compat": {
-        "IncludePatterns": [
-            "src/utils/chromium_test_compat/*"
-        ]
     }
 }

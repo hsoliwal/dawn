@@ -10,10 +10,13 @@ package. This is augmented with the functions declared in [`tools/src/template/t
 
 ## Build file generation
 
-The generator will scan all the Tint source directories to produce `BUILD.gn`
-and `BUILD.cmake` files. These files contain the per-directory targets,
+The generator will scan all the Tint source directories to produce `BUILD.cmake`
+and `BUILD.bazel` files. These files contain the per-directory targets,
 conditionals and inter-target dependency information which is labour-intensive
 to maintain by hand.
+
+It also emits `generated_sources.bzl` for Bazel's source generation. The native
+generator does not emit GN files or require a GN formatter.
 
 The bulk of the build generator logic is in the file: [`tools/src/cmd/gen/build/build.go`](../../tools/src/cmd/gen/build/build.go)
 
