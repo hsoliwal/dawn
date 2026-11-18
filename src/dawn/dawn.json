@@ -1195,33 +1195,6 @@
             {"name": "compute", "type": "compute state"}
         ]
     },
-    "alpha mode": {
-        "category": "enum",
-        "tags": ["dawn"],
-        "values": [
-            {"value": 1, "name": "opaque"},
-            {"value": 2, "name": "premultiplied"},
-            {"value": 3, "name": "unpremultiplied"}
-        ]
-    },
-    "copy texture for browser options": {
-        "category": "structure",
-        "extensible": "in",
-        "tags": ["dawn"],
-        "members": [
-            {"name": "flip y", "type": "bool", "default": "false"},
-            {"name": "needs color space conversion", "type": "bool", "default": "false"},
-            {"name": "src alpha mode", "type": "alpha mode", "default": "unpremultiplied"},
-            {"name": "src transfer function parameters", "type": "float", "annotation": "const*",
-                     "length": 7, "optional": true},
-            {"name": "conversion matrix", "type": "float", "annotation": "const*",
-                     "length": 9, "optional": true},
-            {"name": "dst transfer function parameters", "type": "float", "annotation": "const*",
-                     "length": 7, "optional": true},
-            {"name": "dst alpha mode", "type": "alpha mode", "default": "unpremultiplied"},
-            {"name": "internal usage", "type": "bool", "default": "false"}
-        ]
-    },
     "create compute pipeline async callback": {
         "category": "callback function",
         "args": [
@@ -3041,28 +3014,6 @@
                     {"name": "data size", "type": "size_t"},
                     {"name": "data layout", "type": "texel copy buffer layout", "annotation": "const*"},
                     {"name": "write size", "type": "extent 3D", "annotation": "const*"}
-                ]
-            },
-            {
-                "name": "copy texture for browser",
-                "extensible": "in",
-                "tags": ["dawn"],
-                "args": [
-                    {"name": "source", "type": "texel copy texture info", "annotation": "const*"},
-                    {"name": "destination", "type": "texel copy texture info", "annotation": "const*"},
-                    {"name": "copy size", "type": "extent 3D", "annotation": "const*"},
-                    {"name": "options", "type": "copy texture for browser options", "annotation": "const*"}
-                ]
-            },
-            {
-                "name": "copy external texture for browser",
-                "extensible": "in",
-                "tags": ["dawn"],
-                "args": [
-                    {"name": "source", "type": "image copy external texture", "annotation": "const*"},
-                    {"name": "destination", "type": "texel copy texture info", "annotation": "const*"},
-                    {"name": "copy size", "type": "extent 3D", "annotation": "const*"},
-                    {"name": "options", "type": "copy texture for browser options", "annotation": "const*"}
                 ]
             },
             {

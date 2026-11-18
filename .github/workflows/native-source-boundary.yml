@@ -46,6 +46,22 @@ jobs:
             echo 'Removed Chromium GN build files returned' >&2
             exit 1
           fi
+      - name: Reject removed browser-specific texture queue API
+        shell: bash
+        run: |
+          set -euo pipefail
+          for removed in \
+            src/dawn/native/CopyTextureForBrowserHelper.cpp \
+            src/dawn/native/CopyTextureForBrowserHelper.h \
+            src/dawn/tests/end2end/CopyTextureForBrowserTests.cpp \
+            src/dawn/tests/end2end/CopyExternalTextureForBrowserTests.cpp \
+            src/dawn/tests/unittests/validation/CopyTextureForBrowserTests.cpp; do
+            test ! -e "$removed"
+          done
+          if git grep -n -E 'CopyTextureForBrowser|CopyExternalTextureForBrowser|copy texture for browser|copy external texture for browser' -- src/dawn/dawn.json src/dawn/native src/dawn/tests; then
+            echo 'Browser-only texture copy API was reintroduced' >&2
+            exit 1
+          fi
       - name: Preserve native CMake build and Emscripten refusal
         shell: bash
         run: |

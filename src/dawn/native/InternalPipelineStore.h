@@ -50,13 +50,6 @@ struct InternalPipelineStore {
     explicit InternalPipelineStore(DeviceBase* device);
     ~InternalPipelineStore();
 
-    absl::flat_hash_map<wgpu::TextureFormat, Ref<RenderPipelineBase>>
-        copyTextureForBrowserPipelines;
-    absl::flat_hash_map<wgpu::TextureFormat, Ref<RenderPipelineBase>>
-        copyExternalTextureForBrowserPipelines;
-
-    Ref<ShaderModuleBase> copyForBrowser;
-
     Ref<ComputePipelineBase> timestampComputePipeline;
     Ref<ShaderModuleBase> timestampCS;
 
