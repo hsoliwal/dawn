@@ -55,8 +55,6 @@ set(sources
 
 set(conditional_private_depends)
 
-add_subdirectory(chromium_test_compat)
-
 add_library(dawn_utils_config INTERFACE)
 target_include_directories(dawn_utils_config INTERFACE "${PROJECT_SOURCE_DIR}")
 add_dependencies(dawn_utils_config dawn_warnings_config)
