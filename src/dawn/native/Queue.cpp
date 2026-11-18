@@ -51,7 +51,6 @@
 #include "src/dawn/native/CommandEncoder.h"
 #include "src/dawn/native/CommandValidation.h"
 #include "src/dawn/native/Commands.h"
-#include "src/dawn/native/CopyTextureForBrowserHelper.h"
 #include "src/dawn/native/Device.h"
 #include "src/dawn/native/DynamicUploader.h"
 #include "src/dawn/native/EventManager.h"
@@ -429,58 +428,6 @@ MaybeError QueueBase::WriteTextureImpl(const TexelCopyTextureInfo& destination,
             return GetDevice()->CopyFromStagingToTexture(reservation.buffer.Get(), passDataLayout,
                                                          textureCopy, writeSizePixel);
         });
-}
-
-void QueueBase::APICopyTextureForBrowser(const TexelCopyTextureInfo* source,
-                                         const TexelCopyTextureInfo* destination,
-                                         const Extent3D* copySize,
-                                         const CopyTextureForBrowserOptions* options) {
-    std::ignore = GetDevice()->ConsumedError(
-        CopyTextureForBrowserInternal(source, destination, copySize, options));
-}
-
-void QueueBase::APICopyExternalTextureForBrowser(const ImageCopyExternalTexture* source,
-                                                 const TexelCopyTextureInfo* destination,
-                                                 const Extent3D* copySize,
-                                                 const CopyTextureForBrowserOptions* options) {
-    std::ignore = GetDevice()->ConsumedError(
-        CopyExternalTextureForBrowserInternal(source, destination, copySize, options));
-}
-
-MaybeUnknownError QueueBase::CopyTextureForBrowserInternal(
-    const TexelCopyTextureInfo* sourceOrig,
-    const TexelCopyTextureInfo* destinationOrig,
-    const Extent3D* copySize,
-    const CopyTextureForBrowserOptions* options) {
-    TexelCopyTextureInfo source = WithTrivialFrontendDefaults(*sourceOrig);
-    TexelCopyTextureInfo destination = WithTrivialFrontendDefaults(*destinationOrig);
-
-    if (GetDevice()->IsValidationEnabled()) {
-        DAWN_TRY_CONTEXT(
-            ValidateCopyTextureForBrowser(GetDevice(), &source, &destination, copySize, options),
-            "validating CopyTextureForBrowser from %s to %s", source.texture, destination.texture);
-    }
-
-    DAWN_TRY(DoCopyTextureForBrowser(GetDevice(), &source, &destination, copySize, options));
-    return {};
-}
-
-MaybeUnknownError QueueBase::CopyExternalTextureForBrowserInternal(
-    const ImageCopyExternalTexture* source,
-    const TexelCopyTextureInfo* destinationOrig,
-    const Extent3D* copySize,
-    const CopyTextureForBrowserOptions* options) {
-    TexelCopyTextureInfo destination = WithTrivialFrontendDefaults(*destinationOrig);
-
-    if (GetDevice()->IsValidationEnabled()) {
-        DAWN_TRY_CONTEXT(ValidateCopyExternalTextureForBrowser(GetDevice(), source, &destination,
-                                                               copySize, options),
-                         "validating CopyExternalTextureForBrowser from %s to %s",
-                         source->externalTexture, destination.texture);
-    }
-
-    DAWN_TRY(DoCopyExternalTextureForBrowser(GetDevice(), source, &destination, copySize, options));
-    return {};
 }
 
 MaybeValError QueueBase::ValidateSubmit(Span<CommandBufferBase* const> commands,

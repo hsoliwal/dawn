@@ -269,6 +269,32 @@ class NativeDependenciesTest(unittest.TestCase):
                              (args, 'https://example.invalid/native.git', pin, nested))
 
 
+class RemovedBrowserTextureApiTest(unittest.TestCase):
+    """Browser-specific queue operations must not re-enter the native fork."""
+
+    def test_browser_only_api_is_absent_from_schema_and_native_build(self):
+        schema = json.loads((ROOT / 'src/dawn/dawn.json').read_text(encoding='utf-8'))
+        self.assertNotIn('alpha mode', schema)
+        self.assertNotIn('copy texture for browser options', schema)
+        self.assertFalse(any('for browser' in method['name']
+                             for method in schema['queue']['methods']))
+        for relative in ('src/dawn/native/CopyTextureForBrowserHelper.cpp',
+                         'src/dawn/native/CopyTextureForBrowserHelper.h',
+                         'src/dawn/tests/end2end/CopyTextureForBrowserTests.cpp',
+                         'src/dawn/tests/end2end/CopyExternalTextureForBrowserTests.cpp',
+                         'src/dawn/tests/unittests/validation/CopyTextureForBrowserTests.cpp'):
+            with self.subTest(path=relative):
+                self.assertFalse((ROOT / relative).exists())
+        for relative in ('src/dawn/native/Queue.cpp', 'src/dawn/native/Queue.h',
+                         'src/dawn/native/InternalPipelineStore.h',
+                         'src/dawn/native/CMakeLists.txt', 'src/dawn/tests/CMakeLists.txt'):
+            with self.subTest(path=relative):
+                source = (ROOT / relative).read_text(encoding='utf-8')
+                self.assertNotIn('CopyTextureForBrowser', source)
+                self.assertNotIn('CopyExternalTextureForBrowser', source)
+                self.assertNotIn('copyForBrowser', source)
+
+
 @unittest.skipUnless(CMAKE, 'CMake is required for configuration tests')
 class NativeConfigurationTest(unittest.TestCase):
 

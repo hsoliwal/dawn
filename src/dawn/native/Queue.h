@@ -82,15 +82,6 @@ class QueueBase : public ExecutionQueueBase, public WeakRefSupport<QueueBase> {
                          Span<const std::byte> data,
                          const TexelCopyBufferLayout* dataLayout,
                          const Extent3D* writeSize);
-    void APICopyTextureForBrowser(const TexelCopyTextureInfo* source,
-                                  const TexelCopyTextureInfo* destination,
-                                  const Extent3D* copySize,
-                                  const CopyTextureForBrowserOptions* options);
-    void APICopyExternalTextureForBrowser(const ImageCopyExternalTexture* source,
-                                          const TexelCopyTextureInfo* destination,
-                                          const Extent3D* copySize,
-                                          const CopyTextureForBrowserOptions* options);
-
     MaybeUnknownError WriteBuffer(BufferBase* buffer,
                                   uint64_t bufferOffset,
                                   Span<const std::byte> data);
@@ -130,15 +121,6 @@ class QueueBase : public ExecutionQueueBase, public WeakRefSupport<QueueBase> {
                                            Span<const std::byte> data,
                                            const TexelCopyBufferLayout& dataLayout,
                                            const Extent3D* writeSize);
-    MaybeUnknownError CopyTextureForBrowserInternal(const TexelCopyTextureInfo* source,
-                                                    const TexelCopyTextureInfo* destination,
-                                                    const Extent3D* copySize,
-                                                    const CopyTextureForBrowserOptions* options);
-    MaybeUnknownError CopyExternalTextureForBrowserInternal(
-        const ImageCopyExternalTexture* source,
-        const TexelCopyTextureInfo* destination,
-        const Extent3D* copySize,
-        const CopyTextureForBrowserOptions* options);
     MaybeValError ValidateSubmit(Span<CommandBufferBase* const> commands,
                                  BufferSet& buffersFromCommands) const;
     MaybeValError ValidateOnSubmittedWorkDone() const;
