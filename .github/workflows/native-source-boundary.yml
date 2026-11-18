@@ -62,6 +62,11 @@ jobs:
             echo 'Browser-only texture copy API was reintroduced' >&2
             exit 1
           fi
+      - name: Exercise browser-extension removal and native texture contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/native_build_test.py RemovedBrowserTextureApiTest
       - name: Preserve native CMake build and Emscripten refusal
         shell: bash
         run: |
