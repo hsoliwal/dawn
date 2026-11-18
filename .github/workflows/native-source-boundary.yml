@@ -26,6 +26,10 @@ jobs:
             src/utils/chromium_test_compat
             webgpu-cts third_party/webgpu-cts scripts/dawn_node_cts
             build_overrides infra
+            third_party/v8 third_party/node third_party/emscripten
+            third_party/catapult third_party/depot_tools third_party/perfetto
+            third_party/placeholder_chromium
+            tools/clang tools/mb tools/gn
             tools/src/cov/server.go tools/src/cov/view-coverage.html
           )
           for path in "${removed_paths[@]}"; do
