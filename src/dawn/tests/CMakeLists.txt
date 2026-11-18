@@ -335,7 +335,6 @@ target_link_libraries(dawn_end2end_test_objects PRIVATE
     dawn_native
     dawn_platform
     dawn_proc
-    dawn_shared_utils_chromium_test_compat
     dawn_system_utils
     dawn_test_infra
     dawn_test_utils
@@ -462,7 +461,6 @@ target_link_libraries(dawn_whitebox_test_objects PRIVATE
     dawn_native_objects
     dawn_platform
     dawn_proc
-    dawn_shared_utils_chromium_test_compat
     dawn_system_utils
     dawn_test_infra
     dawn_test_utils
@@ -756,7 +754,6 @@ target_link_libraries(dawn_unittest_objects PRIVATE
     dawn_platform
     dawn_proc
     dawn_shared_utils
-    dawn_shared_utils_chromium_test_compat
     dawn_system_utils
     dawn_test_infra
     dawn_test_utils
