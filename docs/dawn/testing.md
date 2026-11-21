@@ -24,6 +24,22 @@ output directory. Windows executables have the `.exe` suffix. Discover native
 GPU cases with `dawn_end2end_tests --gtest_list_tests`, then execute a selected
 case with `--gtest_filter`; listing tests is not execution.
 
+## Strict native adapter-limit qualification
+
+Native GPU adapter-limit and feature-baseline tests support two modes. By default,
+an adapter missing from the expected table may be skipped for exploratory local
+testing. To fail on an unknown adapter in native CI, run:
+
+```sh
+./out/Tests/dawn_end2end_tests --require-known-adapter-limits
+```
+
+This retains the existing strict behavior of the old
+`--test-launcher-bot-mode` option, which remains accepted as a compatibility
+alias for existing test runners. New scripts should use the native option.
+Both switches only affect missing-baseline behavior in the native test harness;
+neither starts a browser or changes the underlying GPU driver/backends.
+
 ## Native build regression checks
 
 Check native dependency selection, dependency-fetch failures, build-helper
