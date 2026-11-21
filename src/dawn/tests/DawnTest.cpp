@@ -368,10 +368,9 @@ DawnTestEnvironment::DawnTestEnvironment(int argc, char** argv) {
 
     // Create a temporary instance to select available and preferred adapters. This is done before
     // test instantiation so GetAvailableAdapterTestParamsForBackends can generate test
-    // parameterizations all selected adapters. We drop the instance at the end of this function
-    // because the Vulkan validation layers use static global mutexes which behave badly when
-    // Chromium's test launcher forks the test process. The instance will be recreated on test
-    // environment setup.
+    // parameterizations for selected adapters. Release the probe instance before
+    // test setup: Vulkan validation layers may own process-wide synchronization
+    // and each test must create its own instance.
     std::unique_ptr<native::Instance> instance = CreateInstance();
     DAWN_ASSERT(instance);
 
@@ -415,9 +414,11 @@ void DawnTestEnvironment::ParseArgs(int argc, char** argv) {
             continue;
         }
 
-        // This is passed in by the bots on the dawn CQ for dawn end2end tests.
-        if (strcmp("--test-launcher-bot-mode", argv[i]) == 0) {
-            mIsTestLauncherBotMode = true;
+        // Native CI requires known GPU adapter baselines. Keep the retired Chromium
+        // switch as a compatibility alias for existing test scripts.
+        if (strcmp("--require-known-adapter-limits", argv[i]) == 0 ||
+            strcmp("--test-launcher-bot-mode", argv[i]) == 0) {
+            mRequireKnownAdapterLimits = true;
             continue;
         }
 
@@ -915,8 +916,12 @@ bool DawnTestEnvironment::RunSuppressedTests() const {
     return mRunSuppressedTests;
 }
 
+bool DawnTestEnvironment::RequireKnownAdapterLimits() const {
+    return mRequireKnownAdapterLimits;
+}
+
 bool DawnTestEnvironment::IsTestLauncherBotMode() const {
-    return mIsTestLauncherBotMode;
+    return RequireKnownAdapterLimits();
 }
 
 native::BackendValidationLevel DawnTestEnvironment::GetBackendValidationLevel() const {
@@ -1329,8 +1334,12 @@ bool DawnTestBase::RunSuppressedTests() const {
     return gTestEnv->RunSuppressedTests();
 }
 
+bool DawnTestBase::RequireKnownAdapterLimits() const {
+    return gTestEnv->RequireKnownAdapterLimits();
+}
+
 bool DawnTestBase::IsTestLauncherBotMode() const {
-    return gTestEnv->IsTestLauncherBotMode();
+    return RequireKnownAdapterLimits();
 }
 
 bool DawnTestBase::IsDXC() const {

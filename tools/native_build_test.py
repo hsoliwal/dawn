@@ -339,6 +339,27 @@ class RemovedWireSchemaTest(unittest.TestCase):
             self.assertNotIn('webview_instance', source)
 
 
+class NativeAdapterLimitModeTest(unittest.TestCase):
+    """Strict native adapter-limit mode with a compatible legacy test switch."""
+
+    def test_strict_mode_and_legacy_alias_share_one_state(self):
+        env = (ROOT / 'src/dawn/tests/DawnTest.cpp').read_text(encoding='utf-8')
+        header = (ROOT / 'src/dawn/tests/DawnTest.h').read_text(encoding='utf-8')
+        limits = (ROOT / 'src/dawn/tests/end2end/ArchTierLimitsExhaustive.cpp').read_text(
+            encoding='utf-8')
+        self.assertIn('strcmp("--require-known-adapter-limits", argv[i]) == 0', env)
+        self.assertIn('strcmp("--test-launcher-bot-mode", argv[i]) == 0', env)
+        self.assertIn('mRequireKnownAdapterLimits = true;', env)
+        self.assertIn('bool mRequireKnownAdapterLimits = false;', header)
+        self.assertIn('return RequireKnownAdapterLimits();', env)
+        self.assertEqual(2, header.count('bool RequireKnownAdapterLimits() const;'))
+        self.assertEqual(2, header.count('bool IsTestLauncherBotMode() const;'))
+        self.assertEqual(3, limits.count('if (RequireKnownAdapterLimits())'))
+        self.assertNotIn('if (IsTestLauncherBotMode())', limits)
+        self.assertIn('GTEST_SKIP();', limits)
+        self.assertNotIn("Chromium's test launcher forks", env)
+
+
 @unittest.skipUnless(CMAKE, 'CMake is required for configuration tests')
 class NativeConfigurationTest(unittest.TestCase):
 

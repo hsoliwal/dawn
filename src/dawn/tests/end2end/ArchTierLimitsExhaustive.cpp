@@ -270,14 +270,11 @@ device_map["OpenGLES_ANGLE__Google__Vulkan_1_3_0__SwiftShader_Device__Subzero___
         alternate_index++;
         has_next_alternate = device_map.contains(GetFullParamString(alternate_index));
         if (iter_curr_limits == device_map.end()) {
-            // CQ bots will pass in '--test-launcher-bot-mode' as a command line parameter.
-            // In this case, we didn't find any results, so we want to make sure we report an error
-            // as this is a new CQ bot and we need to update the  test results.
-            if (IsTestLauncherBotMode()) {
+            // Native strict mode fails if the adapter has no approved baseline.
+            if (RequireKnownAdapterLimits()) {
                 encountered_error = true;
             } else {
-                // Skipping the test when the device params does not match limits us to only testing
-                // known CQ (and try) bots.
+                // Exploratory runs may skip adapters without an approved baseline.
                 GTEST_SKIP();
             }
         }
@@ -574,14 +571,11 @@ AddDevice({0, 0, 0, 1, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 
     auto iter_end = iter.second;
 
     if (iter_match == iter_end) {
-        // CQ bots will pass in '--test-launcher-bot-mode' as a command line parameter.
-        // In this case, we didn't find any results, so we want to make sure we report an error
-        // as this is a new CQ bot and we need to update the  test results.
-        if (IsTestLauncherBotMode()) {
+        // Native strict mode fails if the adapter has no approved baseline.
+        if (RequireKnownAdapterLimits()) {
             encountered_error = true;
         } else {
-            // Skipping the test when the device params does not match allows us to only
-            // testing known CQ (and try) bots.
+            // Exploratory runs may skip adapters without an approved baseline.
             GTEST_SKIP();
         }
     } else {
@@ -742,14 +736,11 @@ TEST_P(TierArchInfoTest_TieredMaxLimits, SemiExhaustiveTestSubgroupMatrixConfigs
     auto iter_end = iter.second;
 
     if (iter_match == iter_end) {
-        // CQ bots will pass in '--test-launcher-bot-mode' as a command line parameter.
-        // In this case, we didn't find any results, so we want to make sure we report an error
-        // as this is a new CQ bot and we need to update the  test results.
-        if (IsTestLauncherBotMode()) {
+        // Native strict mode fails if the adapter has no approved baseline.
+        if (RequireKnownAdapterLimits()) {
             encountered_error = true;
         } else {
-            // Skipping the test when the device params does not match allows us to only
-            // test known CQ (and try) bots.
+            // Exploratory runs may skip adapters without an approved baseline.
             GTEST_SKIP();
         }
     } else {
