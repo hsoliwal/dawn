@@ -73,6 +73,11 @@ jobs:
           set -euo pipefail
           python3 -m py_compile generator/dawn_json_parsing.py
           python3 tools/native_build_test.py RemovedWireSchemaTest
+      - name: Verify native strict adapter mode and legacy compatibility
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/native_build_test.py NativeAdapterLimitModeTest
       - name: Preserve native CMake build and Emscripten refusal
         shell: bash
         run: |

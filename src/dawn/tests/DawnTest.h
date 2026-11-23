@@ -264,6 +264,8 @@ class DawnTestEnvironment : public testing::Environment {
     const std::vector<std::string>& GetDisabledToggles() const;
 
     bool RunSuppressedTests() const;
+    bool RequireKnownAdapterLimits() const;
+    // Compatibility alias for existing test runners; prefer the native name.
     bool IsTestLauncherBotMode() const;
 
   protected:
@@ -292,7 +294,7 @@ class DawnTestEnvironment : public testing::Environment {
     wgpu::BackendType mWebGPUInnerBackendTypeFilter = wgpu::BackendType::Undefined;
     bool mWebGPUInnerForceFallbackAdapter = false;
     bool mRunSuppressedTests = false;
-    bool mIsTestLauncherBotMode = false;
+    bool mRequireKnownAdapterLimits = false;
 
     ToggleParser mToggleParser;
 
@@ -368,6 +370,8 @@ class DawnTestBase {
     bool IsCompatibilityMode() const;
     bool IsCPU() const;
     bool RunSuppressedTests() const;
+    bool RequireKnownAdapterLimits() const;
+    // Compatibility alias for existing test runners; prefer the native name.
     bool IsTestLauncherBotMode() const;
 
     bool IsDXC() const;
